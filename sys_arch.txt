@@ -1,0 +1,15 @@
+# data flow
+
+dbm (website)
+|
+v
+aws lambda (etl pipeline)
+|
+v
+supabase (postgresql)
+|
+v
+api (vercel)
+|
+v
+client
