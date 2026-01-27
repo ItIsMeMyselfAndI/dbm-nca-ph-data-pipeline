@@ -6,6 +6,8 @@ import pdfplumber
 from pdfplumber.page import Page
 import pandas as pd
 
+from etl.utils.split_op_units_to_list import split_op_units_to_list
+
 
 def load_sample_pdf_bytes():
     with open("./sample_nca.pdf", "rb") as pdf:
@@ -53,18 +55,6 @@ def _join_col_to_str(col: List[str]):
     return ' '.join(filter(None, filtered)).strip()
 
 
-def _sep_op_units_to_list(col: List[str]):
-    """
-        step 1: 'Cebu Normal UniversityBicol State College of Applied Sciences and Technology'
-        step 2: ai
-        step 3: 'Cebu Normal University,Bicol State College of Applied Sciences and Technology'
-        step 4: ['Cebu Normal University', 'Bicol State College of Applied Sciences and Technology']
-    """
-    string = ''.join(filter(lambda x: x != '', col))
-    print(string)
-    return string
-
-
 def _sep_amounts_to_list(col: List[str]):
     """
         step 1: '23434.00233423.652323423.50234234.44'
@@ -80,7 +70,7 @@ def _sep_amounts_to_list(col: List[str]):
         val = item + "." + string_lst[i+1][0:2]
         values.append(float(val))
         pass
-    print(values)
+    # print(values)
     return values
 
 
@@ -137,18 +127,31 @@ def parse_nca_bytes(page_count: Literal["all"] | int,
                 "released_date": "first",
                 "department": lambda col: _join_col_to_str(col),
                 "agency": lambda col: _join_col_to_str(col),
-                "operating_unit": lambda col: _sep_op_units_to_list(col),
+                "operating_unit": lambda col: _join_col_to_str(col),
                 "amount": lambda col: _sep_amounts_to_list(col),
                 "purpose": lambda col: _join_col_to_str(col),
             })
             df = pd.DataFrame(df_merged)
+            while True:
+                try:
+                    print(f"[INFO] Formatting 'OPERATING UNITS' (Page {page_num})...")
+                    df["operating_unit"] = split_op_units_to_list(
+                        df[["operating_unit", "amount"]].values.tolist()
+                    )
+                    print(f"[INFO] Formatted {df["operating_unit"].count()} rows")
+                    break
+                except ValueError as e:
+                    print(f"[ERROR] Failed in formatting 'OPERATING UNIT' (Page {page_num})")
+                    print(f"\t{e}")
+                    print("[INFO] Retrying...")
+            # break
             new_records = df.to_dict(orient="records")
             records.extend(new_records)
             print(f"[INFO] Parsed {df.shape[0]} rows successfully")
             buff = io.StringIO()
             df.info(buf=buff)
             print(_indent_str_buff(buff))
-            _save_nca_xls(release, df, page_num)
+            # _save_nca_xls(release, df, page_num)
     return records
 
 

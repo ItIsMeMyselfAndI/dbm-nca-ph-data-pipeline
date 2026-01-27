@@ -7,7 +7,7 @@ def main():
     pdf_bytes = load_sample_pdf_bytes()
     sample_release = {"title": "SAMPLE NCA", "year": "2025",
                       "filename": "sample_nca.pdf", "url": "#"}
-    records = parse_nca_bytes(5, pdf_bytes, sample_release)
+    records = parse_nca_bytes("all", pdf_bytes, sample_release)
     load_nca_to_db(sample_release, records)
 
 

@@ -1,9 +1,14 @@
 bs4==0.0.2
-dbm-nca-ph-pipeline==0.1.0
+chardet==5.2.0
 h2==4.3.0
+openai==2.15.0
+opencv-python-headless==4.13.0.90
+openpyxl==3.1.5
 pandas==3.0.0
 pdfplumber==0.11.9
 pip==25.3
+pypdf==5.9.0
 python-dotenv==1.2.1
 supabase==2.27.2
+tabulate==0.9.0
 xlsxwriter==3.2.9

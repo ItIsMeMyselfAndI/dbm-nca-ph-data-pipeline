@@ -12,7 +12,7 @@ def _insert_release(release: Dict):
         db_release = None
         print(
             f"[ERROR] Failed inserting 'NCA-{release["year"]}' release to db")
-    print(db_release)
+    # print(db_release)
     return db_release
 
 
@@ -30,7 +30,7 @@ def _insert_records(release: Dict, records: List[Dict]):
         db_records = None
         print(
             f"[ERROR] Failed inserting 'NCA-{release["year"]}' records to db")
-    print(db_records)
+    # print(db_records)
     return db_records
 
 
@@ -38,5 +38,5 @@ def load_nca_to_db(release: Dict, records: List[Dict]):
     db_release = _insert_release(release)
     if db_release:
         _add_release_id_to_records(db_release["id"], records)
-        print(records)
+        # print(records)
         db_records = _insert_records(release, records)
