@@ -58,20 +58,16 @@ def _join_col_to_list(col: List[str],
     col = list(col)
     type_casters = {"str": str, "int": int, "float": float}
     type_caster = type_casters[item_type]
-    values = [col[0]]
-    for entry in col[1:]:
-        if "\n" not in entry:
-            value = entry.replace("\n", "")
-            if value:
-                values.append(value)
-                # print(value)
-        else:
-            values[-1] += entry
+    values = []
+    for val in col:
+        if val:
+            values.append(val)
+    # type casting
     for i, entry in enumerate(values):
         if item_type == "int" or item_type == "float":
             value = entry.replace(",", "")
         else:
-            value = entry.replace("", "None")
+            value = entry
         values[i] = type_caster(value)
     return values
 
@@ -94,10 +90,13 @@ def _save_nca_xls(release: Dict | None, df: pd.DataFrame, page_num: int):
     print(f"[INFO] Saved page {page_num} '{filename}' to {folder}/")
 
 
-def parse_nca_bytes(bytes: BytesIO, release: Dict | None = None):
+def parse_nca_bytes(page_count: Literal["all"] | int,
+                    bytes: BytesIO, release: Dict | None = None):
+    records: List[Dict] = []
     with pdfplumber.open(bytes) as pdf:
-        records = []
         for page_num, page in enumerate(pdf.pages):
+            if page_count != "all" and page_num > page_count:
+                break
             print(f"[INFO] Parsing table in page {page_num}...")
             vert_lines = _get_vert_lines(page)
             TABLE_SETTINGS = {
@@ -132,13 +131,15 @@ def parse_nca_bytes(bytes: BytesIO, release: Dict | None = None):
             })
             df = pd.DataFrame(df_merged)
             new_records = df.to_dict(orient="records")
-            records.append(new_records)
+            records.extend(new_records)
             print(f"[INFO] Parsed {df.shape[0]} rows successfully")
             buff = io.StringIO()
             df.info(buf=buff)
             print(_indent_str_buff(buff))
-            # _save_nca_xls(release, df, page_num)
+            _save_nca_xls(release, df, page_num)
+    return records
 
 
-bytes = load_sample_pdf_bytes()
-parse_nca_bytes(bytes)
+if __name__ == "__main__":
+    bytes = load_sample_pdf_bytes()
+    records = parse_nca_bytes(4, bytes)

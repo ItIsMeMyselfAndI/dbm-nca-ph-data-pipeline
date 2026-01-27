@@ -24,7 +24,7 @@ def get_nca_pdf_releases() -> List[Dict]:
             url = BASE_URL + url
         title = elem.get_text(strip=True)
         filename = url.split("/")[-1]
-        year = 0
+        year = None
         if "UPDATED" in filename:
             year = datetime.now().year
         else:
@@ -68,8 +68,8 @@ def save_nca_pdf(release: Dict, bytes: BytesIO):
         print(f"[INFO] Saved '{filename}' to {folder}/")
 
 
-# # test
-# pdf_releases = get_nca_pdf_releases()
-# for release in pdf_releases:
-#     bytes = download_nca_pdf_bytes(release)
-#     save_nca_pdf(release, bytes)
+if __name__ == "__main__":
+    pdf_releases = get_nca_pdf_releases()
+    for release in pdf_releases:
+        bytes = download_nca_pdf_bytes(release)
+        save_nca_pdf(release, bytes)

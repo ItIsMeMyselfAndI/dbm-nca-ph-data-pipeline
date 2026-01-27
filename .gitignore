@@ -1,2 +1,5 @@
 venv/
 releases/
+*pycache*
+.env
+*egg-info/
