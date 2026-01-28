@@ -172,6 +172,7 @@ def parse_nca_bytes(page_count: Literal["all"] | int,
                 "purpose": lambda col: _join_col_to_str(col),
             })
             df = pd.DataFrame(df_merged)
+            df["table_num"] = page_num
             new_records = df.to_dict(orient="records")
             records.extend(new_records)
             buff = io.StringIO()

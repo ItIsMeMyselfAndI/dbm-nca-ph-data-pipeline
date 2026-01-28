@@ -4,6 +4,7 @@
 CREATE TABLE public.nca (
   id int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   release_id int NOT NULL,
+  table_num int,
   nca_number text,
   nca_type text,
   agency text,
