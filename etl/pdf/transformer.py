@@ -7,8 +7,8 @@ from pdfplumber.page import Page
 import pandas as pd
 
 
-def load_sample_bytes():
-    with open("./sample_nca.pdf", "rb") as pdf:
+def load_sample_bytes(filename: str):
+    with open(filename, "rb") as pdf:
         bytes = pdf.read()
     return BytesIO(bytes)
 
@@ -27,6 +27,25 @@ def _get_vert_lines(page: Page):
             if i == len(lines) - 1:
                 vert_lines.append(line[2])
     return vert_lines
+
+
+def _convert_table_to_df(table: List[List[str | None]]):
+    print("[*]\tConverting table into DataFrame...")
+    valid_header = [
+        "nca_number", "nca_type", "released_date", "department",
+        "agency", "operating_unit", "amount", "purpose",
+    ]
+    table_header = [item.lower().replace(
+        " ", "_") if item else "" for item in table[0]]
+    try:
+        df = pd.DataFrame(table[1:], columns=table_header)
+        df = pd.DataFrame(df[valid_header])
+        # print(df.columns.values)
+        print("[*]\tFinished conversion")
+        return df
+    except Exception:
+        print("[!]\tPDF is unreadable (skipped)")
+        return None
 
 
 def _join_col_to_str(col: List[str]):
@@ -104,19 +123,18 @@ def parse_nca_bytes(page_count: Literal["all"] | int,
             }
             # im = page.to_image()
             # im.debug_tablefinder(TABLE_SETTINGS).show()
-            header = [
-                "nca_number", "nca_type", "released_date", "department",
-                "agency", "operating_unit", "amount", "purpose",
-            ]
             table = page.extract_table(TABLE_SETTINGS)
             if not table:
                 continue
-            df = pd.DataFrame(table[1:], columns=header)
-            df["nca_number"] = df["nca_number"].replace('', None)
-            df["nca_number"] = df["nca_number"].ffill()
+            df = _convert_table_to_df(table)
+            if df is None:
+                continue
+            df["released_date"] = df["released_date"].replace('', None)
+            df["released_date"] = df["released_date"].ffill()
             df_merged = df.groupby("nca_number", as_index=False).agg({
                 "nca_type": "first",
                 "released_date": "first",
+                # "released_date": lambda col: _join_col_to_str(col),
                 "department": lambda col: _join_col_to_str(col),
                 "agency": lambda col: _join_col_to_str(col),
                 "operating_unit": lambda col: _sep_op_units_to_list(col),
@@ -138,7 +156,7 @@ def parse_nca_bytes(page_count: Literal["all"] | int,
 
 
 if __name__ == "__main__":
-    bytes = load_sample_bytes()
+    bytes = load_sample_bytes("./releases/NCA-Releases-FY-2023.pdf")
     sample_release = {"title": "SAMPLE NCA", "year": "2025",
                       "filename": "sample_nca.pdf", "url": "#"}
-    records = parse_nca_bytes(4, bytes, sample_release)
+    records = parse_nca_bytes(20, bytes, sample_release)

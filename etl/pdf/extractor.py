@@ -11,9 +11,17 @@ NCA_PAGE = "https://www.dbm.gov.ph/index.php/notice-of-cash-allocation-nca-listi
 
 
 def get_nca_pdf_releases() -> List[Dict]:
+    website_name = "PH-DBM"
     # scrape
+    print(f"[INFO] Scraping '{website_name}' website for downloadable pdfs...")
     res = requests.get(NCA_PAGE, timeout=30)
-    res.raise_for_status()
+    try:
+        res.raise_for_status()
+    except Exception as e:
+        print(f"[!] Failed scraping '{website_name}'")
+        print(f"\t{e}")
+        print("[*] Retrying...")
+        get_nca_pdf_releases()
     soup = BeautifulSoup(res.content, "html.parser")
     pdf_releases = []
     for elem in soup.find_all("a", href=re.compile(r".*NCA.*\.pdf$", re.I)):
@@ -39,22 +47,29 @@ def get_nca_pdf_releases() -> List[Dict]:
         })
     # logs
     length = len(pdf_releases)
-    print(f"[INFO] {length if length > 0 else "No"} {
-          "pdfs" if length > 1 else "pdf"} found")
+    print(f"[*]\tFound {length} {"pdfs" if length > 1 else "pdf"}")
     for i, link in enumerate(pdf_releases):
-        print(f"({i})\tTitle: {link["title"]}")
-        print(f"\tFilename: {link["filename"]}")
-        print(f"\tYear: {link["year"]}")
-        print(f"\tURL: {link["url"]}")
+        print(f"\t({i})\tTitle: {link["title"]}")
+        print(f"\t\tFilename: {link["filename"]}")
+        print(f"\t\tYear: {link["year"]}")
+        print(f"\t\tURL: {link["url"]}")
+    print("[INFO] Finished scraping PH-DBM website")
     return pdf_releases
 
 
 def download_nca_pdf_bytes(release: Dict) -> BytesIO:
     url = release["url"]
     filename = release["filename"]
+    print(f"[INFO] Downloading '{filename}' into bytes...")
     res = requests.get(url)
-    res.raise_for_status()
-    print(f"[INFO] Downloaded '{filename}'")
+    try:
+        res.raise_for_status()
+    except Exception as e:
+        print(f"[!] Failed downlading '{filename}'")
+        print(f"\t{e}")
+        print("[*] Retrying...")
+        download_nca_pdf_bytes(release)
+    print(f"[INFO] Finished downloading '{filename}'")
     return BytesIO(res.content)
 
 
@@ -72,4 +87,4 @@ if __name__ == "__main__":
     pdf_releases = get_nca_pdf_releases()
     for release in pdf_releases:
         bytes = download_nca_pdf_bytes(release)
-        save_nca_pdf(release, bytes)
+        # save_nca_pdf(release, bytes)
