@@ -8,7 +8,7 @@ CREATE TABLE public.nca (
   nca_type text,
   agency text,
   department text,
-  released_date date,
+  released_date text,
   purpose text,
   operating_unit text[],
   amount double precision[],

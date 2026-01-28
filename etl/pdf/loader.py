@@ -1,3 +1,5 @@
+import time
+
 from typing import Dict, List
 from client import supabase
 
@@ -21,22 +23,43 @@ def _add_release_id_to_records(release_id: str, records: List[Dict]):
         record["release_id"] = release_id
 
 
-def _insert_records(release: Dict, records: List[Dict]):
-    result = supabase.table("nca").insert(records).execute()
-    db_records = result.model_dump(mode="python").get("data")
+def _insert_records(release: Dict, records: List[Dict], batch_num: int):
+    db_records = []
+    try:
+        result = supabase.table("nca").insert(records).execute()
+        db_records = result.model_dump(mode="python").get("data")
+    except Exception as e:
+        print("[!]\tError occured during db insertion")
+        print(f"\t{e}")
+        print("[*]\tRetrying...")
+        _insert_records(release, records, batch_num)
+
     if db_records and len(db_records) == len(records):
-        print(f"[INFO] Inserted 'NCA-{release["year"]}' records to db")
+        print(f"[*]\tInserted 'NCA-{release["year"]}' (batch-{batch_num})")
     else:
         db_records = None
         print(
-            f"[ERROR] Failed inserting 'NCA-{release["year"]}' records to db")
+            f"[!]\tFailed inserting 'NCA-{release["year"]}' (batch-{batch_num})")
+        print("[*]\tRetrying...")
+        _insert_records(release, records, batch_num)
     # print(db_records)
     return db_records
 
 
 def load_nca_to_db(release: Dict, records: List[Dict]):
     db_release = _insert_release(release)
+    print(f"[INFO] Inserting '{release["title"]}' records")
     if db_release:
         _add_release_id_to_records(db_release["id"], records)
         # print(records)
-        db_records = _insert_records(release, records)
+        db_records = []
+        batch_num = 0
+        for i in range(0, len(records), 100):
+            batch_records = records[i:i+100]
+            db_batch_records = _insert_records(
+                release, batch_records, batch_num)
+            if db_batch_records:
+                db_records.extend(db_batch_records)
+            time.sleep(1)
+            batch_num += 1
+    print(f"[INFO] Finished  inserting '{release["title"]}' records")

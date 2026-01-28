@@ -134,7 +134,6 @@ def parse_nca_bytes(page_count: Literal["all"] | int,
             df_merged = df.groupby("nca_number", as_index=False).agg({
                 "nca_type": "first",
                 "released_date": "first",
-                # "released_date": lambda col: _join_col_to_str(col),
                 "department": lambda col: _join_col_to_str(col),
                 "agency": lambda col: _join_col_to_str(col),
                 "operating_unit": lambda col: _sep_op_units_to_list(col),
@@ -156,7 +155,7 @@ def parse_nca_bytes(page_count: Literal["all"] | int,
 
 
 if __name__ == "__main__":
-    bytes = load_sample_bytes("./releases/NCA-Releases-FY-2023.pdf")
+    bytes = load_sample_bytes("./releases/NCA-Releases-FY-2021.pdf")
     sample_release = {"title": "SAMPLE NCA", "year": "2025",
                       "filename": "sample_nca.pdf", "url": "#"}
     records = parse_nca_bytes(20, bytes, sample_release)
