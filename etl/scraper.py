@@ -10,21 +10,23 @@ from etl.utils.parse_nca_pdf_2_bytes import parse_nca_pdf_2_bytes
 from etl.utils.nca_bytes_2_pdf import nca_bytes_2_pdf
 
 
-def get_last_db_release():
-    result = supabase.table("release").select(
+def get_last_db(table_name: str):
+    result = supabase.table(table_name).select(
         "*").order("id", desc=True).limit(1).execute()
     data = result.model_dump(mode="python").get("data")
     if data:
-        db_release = data[0]
+        db_row = data[0]
     else:
-        db_release = None
-    return db_release
+        db_row = None
+    return db_row
 
 
-def process_records(page_count: Literal["all"] | int, release: Dict):
+def process_records(page_count: Literal["all"] | int,
+                    release: Dict, db_last_record: Dict | None):
     bytes = download_nca_pdf_bytes(release)
     nca_bytes_2_pdf(release, bytes)
-    data = parse_nca_bytes_2_records(page_count, bytes, release)
+    data = parse_nca_bytes_2_records(page_count, bytes,
+                                     release, db_last_record)
     load_nca_to_db(release, data["records"], data["allocations"])
 
 
@@ -38,7 +40,7 @@ def main():
                 available releases.
     """
     print("[INFO] Updating NCA db...")
-    db_last_release = get_last_db_release()
+    db_last_release = get_last_db("release")
     releases = get_nca_pdf_releases()
     if len(releases) == 0:
         print("[ERROR] Failed to update NCA db")
@@ -48,17 +50,18 @@ def main():
     # curr_year = 2027
     if db_last_release:
         # replace last release
+        db_last_record = get_last_db("record")
         if db_last_release["year"] == curr_year:
             latest_release = releases[-1]
             delete_latest_nca_in_db(db_last_release)
-            process_records("all", latest_release)
+            process_records("all", latest_release, db_last_record)
             print("[*]\tUpdated last release")
         # add all new/latest release
         else:
             has_added = False
             for release in releases:
                 if release["year"] > db_last_release["year"]:
-                    process_records("all", release)
+                    process_records("all", release, db_last_record)
                     print("[*]\tAdded new release")
                     has_added = True
             if not has_added:
@@ -67,7 +70,7 @@ def main():
         # add all releases
         for release in releases:
             if release["year"] >= 2024:
-                process_records("all", release)
+                process_records("all", release, None)
                 print("[*]\tAdded new release")
     print("[INFO] Updated NCA db successfully")
 
@@ -77,7 +80,7 @@ def test():
     bytes = parse_nca_pdf_2_bytes("./releases/NCA_2024.pdf")
     sample_release = {"title": "SAMPLE NCA", "year": "2025",
                       "filename": "sample_nca.pdf", "url": "#"}
-    data = parse_nca_bytes_2_records(10, bytes, sample_release)
+    data = parse_nca_bytes_2_records(10, bytes, sample_release, None)
     load_nca_to_db(sample_release, data["records"], data["allocations"])
 
 

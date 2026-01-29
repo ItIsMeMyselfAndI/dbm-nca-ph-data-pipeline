@@ -96,12 +96,24 @@ def _join_col_to_str(col: List[str]):
     return joined_str
 
 
+def _get_records_df(df: pd.DataFrame, table_num: int):
+    print("[*]\tFormatting records dataframe...")
+    df["table_num"] = table_num
+    df_records = pd.DataFrame(
+        df[["id", "nca_number", "nca_type", "released_date",
+            "department", "purpose", "table_num"]]
+    ).drop_duplicates(subset="nca_number")
+    print("[*]\tFormatted records dataframe successfully")
+    return df_records
+
+
 def _get_allocations_df(df: pd.DataFrame):
     """
         for row in df:
             if row all Nan: push row to allocations
             else: concatenate row items to allocations[-1] items
     """
+    print("[*]\tFormatting allocations dataframe...")
     header = ["agency",
               "operating_unit", "amount"]
     new_df = pd.DataFrame(df[header])
@@ -110,35 +122,37 @@ def _get_allocations_df(df: pd.DataFrame):
     new_df = new_df.fillna("")
     # print("new_df")
     # print(new_df.tail(50))
-    allocations = [new_df.iloc[0]]
+    df_allocations = [new_df.iloc[0]]
     for _, row in new_df.iloc[1:].iterrows():
         if (row[header] == "").all():
-            allocations.append(row)
+            df_allocations.append(row)
         else:
-            last_idx = len(allocations) - 1
-            allocations[last_idx]["agency"] += " " + row["agency"]
-            allocations[last_idx]["operating_unit"] += " " + \
+            last_idx = len(df_allocations) - 1
+            df_allocations[last_idx]["agency"] += " " + row["agency"]
+            df_allocations[last_idx]["operating_unit"] += " " + \
                 row["operating_unit"]
-            allocations[last_idx]["amount"] += " " + row["amount"]
-    allocations = pd.DataFrame(allocations).replace("", np.nan)
-    allocations = pd.DataFrame(
-        allocations.dropna(subset=header, how="all"))
-    allocations[header] = allocations[header].fillna("").map(lambda x: x.strip())
-    allocations["amount"] = pd.to_numeric(
-        allocations["amount"].str.replace(",", ""), errors="coerce")
-    allocations = allocations.dropna(subset=["amount"])
+            df_allocations[last_idx]["amount"] += " " + row["amount"]
+    df_allocations = pd.DataFrame(df_allocations).replace("", np.nan)
+    df_allocations = pd.DataFrame(
+        df_allocations.dropna(subset=header, how="all"))
+    df_allocations[header] = df_allocations[header].fillna("").map(lambda x: x.strip())
+    df_allocations["amount"] = pd.to_numeric(
+        df_allocations["amount"].str.replace(",", ""), errors="coerce")
+    df_allocations = df_allocations.dropna(subset=["amount"])
     # print("alloc")
     # print(allocations.tail(50))
-    return allocations
+    print("[*]\tFormatted allocations dataframe successfully")
+    return df_allocations
 
 
 def parse_nca_bytes_2_records(page_count: Literal["all"] | int,
-                              bytes: BytesIO, release: Dict):
+                              bytes: BytesIO, release: Dict,
+                              db_last_record: Dict | None):
     print(f"[INFO] Preparing 'NCA-{release["year"]}' for db operations...")
     records: List[Dict] = []
     allocations: List[Dict] = []
     x_positions = X_POSITIONS
-    last_record_id = 0
+    last_record_id = db_last_record["id"] if db_last_record else 0
     with pdfplumber.open(bytes) as pdf:
         for page_num, page in enumerate(pdf.pages):
             if page_num == 0:
@@ -194,12 +208,8 @@ def parse_nca_bytes_2_records(page_count: Literal["all"] | int,
             #                     ascending=False)
             df["id"] = range(last_record_id, last_record_id + df.shape[0])
             last_record_id += df.shape[0]
-            df["table_num"] = page_num
-            df_records = pd.DataFrame(
-                df[["id", "nca_number", "nca_type", "released_date",
-                    "department", "purpose", "table_num"]]
-            ).drop_duplicates(subset="nca_number")
-            df_allocations = _get_allocations_df(df.sort_index())
+            df_records = _get_records_df(df, page_num)
+            df_allocations = _get_allocations_df(df)
             # print(df_records["nca_number"])
             # print(df_allocations["nca_number"])
             # print(df.values)
@@ -224,6 +234,6 @@ if __name__ == "__main__":
     bytes = parse_nca_pdf_2_bytes("./releases/NCA-2016.pdf")
     sample_release = {"title": "SAMPLE NCA", "year": "2025",
                       "filename": "sample_nca.pdf", "url": "#"}
-    data = parse_nca_bytes_2_records(50, bytes, sample_release)
+    data = parse_nca_bytes_2_records(50, bytes, sample_release, None)
     # print(data["records"])
     # print(data["allocations"])
