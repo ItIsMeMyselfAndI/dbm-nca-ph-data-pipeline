@@ -24,8 +24,8 @@ def get_last_db_release():
 def process_records(page_count: Literal["all"] | int, release: Dict):
     bytes = download_nca_pdf_bytes(release)
     nca_bytes_2_pdf(release, bytes)
-    records = parse_nca_bytes_2_records(page_count, bytes, release)
-    load_nca_to_db(release, records)
+    data = parse_nca_bytes_2_records(page_count, bytes, release)
+    load_nca_to_db(release, data["records"], data["allocations"])
 
 
 def main():
@@ -40,6 +40,9 @@ def main():
     print("[INFO] Updating NCA db...")
     db_last_release = get_last_db_release()
     releases = get_nca_pdf_releases()
+    if len(releases) == 0:
+        print("[ERROR] Failed to update NCA db")
+        return
     releases.sort(key=lambda x: x["year"])
     curr_year = datetime.now().year
     # curr_year = 2027
@@ -63,18 +66,19 @@ def main():
     else:
         # add all releases
         for release in releases:
-            process_records("all", release)
-            print("[*]\tAdded new release")
+            if release["year"] >= 2024:
+                process_records("all", release)
+                print("[*]\tAdded new release")
     print("[INFO] Updated NCA db successfully")
 
 
 def test():
     # releases = get_nca_pdf_releases()
-    bytes = parse_nca_pdf_2_bytes("./sample_nca.pdf")
+    bytes = parse_nca_pdf_2_bytes("./releases/NCA_2024.pdf")
     sample_release = {"title": "SAMPLE NCA", "year": "2025",
                       "filename": "sample_nca.pdf", "url": "#"}
-    records = parse_nca_bytes_2_records(10, bytes, sample_release)
-    load_nca_to_db(sample_release, records)
+    data = parse_nca_bytes_2_records(10, bytes, sample_release)
+    load_nca_to_db(sample_release, data["records"], data["allocations"])
 
 
 if __name__ == "__main__":

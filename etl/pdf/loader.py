@@ -1,5 +1,4 @@
 import time
-
 from typing import Dict, List
 from client import supabase
 
@@ -9,40 +8,51 @@ def _insert_release(release: Dict):
     data = result.model_dump(mode="python").get("data")
     if data:
         db_release = data[0]
-        print(f"[INFO] Inserted 'NCA-{release["year"]}' release to db")
+        print(f"[INFO] Inserted 'NCA-{release['year']}' release to db")
     else:
         db_release = None
         print(
-            f"[ERROR] Failed inserting 'NCA-{release["year"]}' release to db")
-    # print(db_release)
+            f"[ERROR] Failed inserting 'NCA-{release['year']}' release to db")
     return db_release
 
 
-def _add_release_id_to_records(release_id: str, records: List[Dict]):
-    for record in records:
-        record["release_id"] = release_id
+def _add_release_id(release_id: str, data: List[Dict]):
+    for row in data:
+        row["release_id"] = release_id
 
 
-def _insert_records(release: Dict, records: List[Dict], batch_num: int):
-    db_records = []
-    try:
-        result = supabase.table("nca").insert(records).execute()
-        db_records = result.model_dump(mode="python").get("data")
-    except Exception as e:
-        print("[!]\tError occured during db insertion")
-        print(f"\t{e}")
-        print("[*]\tRetrying...")
-        _insert_records(release, records, batch_num)
-    if db_records and len(db_records) == len(records):
-        print(f"[*]\t{release["filename"]} (batch-{batch_num}) added")
-    else:
-        db_records = None
-        print(
-            f"[!]\tFailed adding {release["filename"]} (batch-{batch_num})")
-        print("[*]\tRetrying...")
-        _insert_records(release, records, batch_num)
-    # print(db_records)
-    return db_records
+def _insert_batch(table_name: str, release: Dict,
+                  data: List[Dict], batch_num: int):
+    max_attempt = 3
+    i = 0
+    while i < max_attempt:
+        try:
+            result = supabase.table(table_name).insert(data).execute()
+            inserted_rows = result.model_dump(mode="python").get("data")
+
+            if inserted_rows and len(inserted_rows) == len(data):
+                print(f"[*]\tNCA-{release['year']
+                              } {table_name}s (batch-{batch_num}) added")
+                return inserted_rows
+            else:
+                print(f"[!]\tFailed adding {release['filename']} {
+                      table_name}s (batch-{batch_num})")
+                print(f"[*]\tRetrying (attempt-{i+1})...")
+                i += 1
+                time.sleep(0.5)
+                continue
+
+        except Exception as e:
+            print(f"[!]\tError occured during {table_name}s insertion")
+            print(f"\t{e}")
+            print(f"[*]\tRetrying (attempt-{i+1})...")
+            i += 1
+            time.sleep(0.5)
+            continue
+
+    print(f"[!]\tMax attempts ({max_attempt}) exceeded")
+    print(f"[!]\tFailed to insert batch-{batch_num} {table_name}s")
+    return None
 
 
 def delete_latest_nca_in_db(db_last_release: Dict):
@@ -52,20 +62,23 @@ def delete_latest_nca_in_db(db_last_release: Dict):
     print("[INFO] Finished Deleting 'latest'")
 
 
-def load_nca_to_db(release: Dict, records: List[Dict]):
+def load_nca_to_db(release: Dict, records: List[Dict],
+                   allocations: List[Dict]):
     db_release = _insert_release(release)
-    print(f"[INFO] Inserting '{release["filename"]}' records...")
+    print(f"[INFO] Inserting '{release['filename']}'...")
     if db_release:
-        _add_release_id_to_records(db_release["id"], records)
-        # print(records)
-        db_records = []
-        batch_num = 0
-        for i in range(0, len(records), 100):
-            batch_records = records[i:i+100]
-            db_batch_records = _insert_records(
-                release, batch_records, batch_num)
-            if db_batch_records:
-                db_records.extend(db_batch_records)
+        batch_size = 100
+        _add_release_id(db_release["id"], records)
+        # insert records
+        for i in range(0, len(records), batch_size):
+            batch_num = (i // batch_size) + 1
+            _insert_batch("record", release,
+                          records[i:i+batch_size], batch_num)
             time.sleep(1)
-            batch_num += 1
-    print(f"[INFO] Finished  inserting '{release["filename"]}' records")
+        # insert allocations
+        for i in range(0, len(allocations), batch_size):
+            batch_num = (i // batch_size) + 1
+            _insert_batch("allocation", release,
+                          allocations[i:i+batch_size], batch_num)
+            time.sleep(1)
+    print(f"[INFO] Finished '{release['filename']}' db operations")
