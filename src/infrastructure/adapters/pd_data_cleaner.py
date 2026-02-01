@@ -70,7 +70,7 @@ class PdDataCleaner:
             curr_is_valid = pd.notna(current_nca) and str(current_nca).strip() != ""
             last_is_valid = pd.notna(last_nca) and str(last_nca).strip() != ""
 
-            if last_is_valid and curr_is_valid and current_nca != last_nca:
+            if last_is_valid and curr_is_valid and current_nca != last_nca: # pyright: ignore
                 # Adding the spacer
                 empty_row = pd.Series([""] * len(df.columns), index=df.columns)
                 new_rows.append(empty_row)

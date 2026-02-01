@@ -7,8 +7,7 @@ from bs4 import BeautifulSoup
 import requests
 
 from core.entities.release import Release
-from etl.pdf.extractor import NCA_PAGE
-from infrastructure.constants import BASE_URL
+from infrastructure.constants import BASE_URL, NCA_PAGE
 
 
 class NCAScraper:

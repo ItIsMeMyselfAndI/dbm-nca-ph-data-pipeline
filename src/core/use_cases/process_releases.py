@@ -27,7 +27,7 @@ class ProcessReleases:
 
     def run(self, releases: List[Release]):
         if len(releases) == 0:
-            logger.warning("Skipping processes: No new/updated release found.")
+            logger.warning("Skipping processes: No new/updated releases found.")
             return
 
         for release in releases:
