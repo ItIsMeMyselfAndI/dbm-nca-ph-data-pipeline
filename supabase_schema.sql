@@ -1,6 +1,6 @@
 -- releases
 CREATE TABLE public.release (
-  id int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  id text PRIMARY KEY,
   title text,
   filename text,
   url text,
@@ -17,10 +17,9 @@ CREATE TABLE public.record (
   department text,
   released_date text,
   purpose text,
-  table_num int,
   created_at timestamptz DEFAULT CURRENT_TIMESTAMP,
   updated_at timestamptz DEFAULT CURRENT_TIMESTAMP,
-  release_id int NOT NULL REFERENCES public.release(id) ON DELETE CASCADE
+  release_id text NOT NULL REFERENCES public.release(id) ON DELETE CASCADE
 );
 
 -- operating units & amounts
@@ -37,8 +36,6 @@ CREATE TABLE public.allocation (
 -- indeces
 CREATE INDEX IF NOT EXISTS idx_release_id ON public.release(id);
 CREATE INDEX IF NOT EXISTS idx_record_id ON public.record(id);
+CREATE INDEX IF NOT EXISTS idx_record_nca_number ON public.record(nca_number);
 CREATE INDEX IF NOT EXISTS idx_allocation_id ON public.allocation(id);
-CREATE INDEX IF NOT EXISTS idx_record_nca_number
-ON public.record(nca_number);
-CREATE INDEX IF NOT EXISTS idx_allocation_nca_number
-ON public.allocation(nca_number);
+CREATE INDEX IF NOT EXISTS idx_allocation_nca_number ON public.allocation(nca_number);

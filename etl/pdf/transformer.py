@@ -13,7 +13,7 @@ X_POSITIONS = [
     19.439992224, 133.439946624,
     182.159927136, 275.9998896,
     389.15984433600005, 500.159799936,
-    638.159744736, 737.9997048, 1000.00000
+    638.159744736, 737.9997048, 1100.00000
 ]
 POSSIBLE_HEADERS = [
     "nca_number", "nca_type", "approved_date", "released_date", "department",
@@ -127,8 +127,6 @@ def _clean_df(df: pd.DataFrame, table_num: int):
     print("[*]\tCleaning DataFrame...")
     df["nca_number"] = df["nca_number"].replace('', np.nan)
     df["nca_number"] = df["nca_number"].ffill()
-    # print(df[["nca_number", "nca_type", "released_date",
-    #       "department", "agency", "amount"]].head(20))
     df_merged = df.groupby("nca_number", as_index=False).agg({
         "nca_type": lambda col: _join_col_to_str(col),
         "released_date": lambda col: _join_col_to_str(col),

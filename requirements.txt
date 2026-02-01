@@ -1,10 +1,14 @@
 bs4==0.0.2
 chardet==5.2.0
+dbm-nca-ph-etl==0.1.0
+dbm-nca-ph-pipeline==0.1.0
 h2==4.3.0
 pandas==3.0.0
 pdfplumber==0.11.9
 pip==25.3
+pydantic-settings==2.12.0
 pypdf==5.9.0
-python-dotenv==1.2.1
+PyPDF2==3.0.1
 supabase==2.27.2
+tqdm==4.67.2
 xlsxwriter==3.2.9

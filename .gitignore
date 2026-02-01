@@ -1,5 +1,8 @@
 venv/
-releases/
 *pycache*
 .env
 *egg-info/
+
+releases/
+data/
+raw/
