@@ -16,12 +16,21 @@ class SupabseRepository:
         )
         self.db_bulk_size = db_bulk_size
 
+    def get_release(self, id: str) -> Release | None:
+        response = self.client.table("release").select(
+            "*").eq("id", id).limit(1).execute()
+        try:
+            db_row = Release(**response.data[0])  # pyright: ignore
+            return db_row
+        except Exception:
+            return None
+
     def get_last_release(self) -> Release | None:
         response = self.client.table("release").select(
             "*").limit(1).order("id", desc=True).execute()
         try:
-            inserted_row = Release(**response.data[0])  # pyright: ignore
-            return inserted_row
+            db_row = Release(**response.data[0])  # pyright: ignore
+            return db_row
         except Exception:
             return None
 

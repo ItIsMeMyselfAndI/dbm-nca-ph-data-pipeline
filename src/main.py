@@ -39,6 +39,7 @@ def main():
     # init use cases
     ingest_job = IngestReleases(scraper=scraper,
                                 storage=storage,
+                                parser=parser,
                                 repository=repository,
                                 base_raw_path=BASE_RAW_STORAGE_PATH,
                                 base_releases_path=BASE_RELEASES_STORAGE_PATH

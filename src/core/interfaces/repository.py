@@ -5,8 +5,12 @@ from src.core.entities.release import Release
 
 
 class RepositoryProvider(Protocol):
-    def get_last_release(self) -> Release | None:
+    def get_release(self, id: str) -> Release | None:
         """get release with an id"""
+        ...
+
+    def get_last_release(self) -> Release | None:
+        """get the last release in order of id"""
         ...
 
     def upsert_release(self, release: Release) -> None:

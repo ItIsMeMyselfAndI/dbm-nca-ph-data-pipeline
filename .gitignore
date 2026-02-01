@@ -6,3 +6,5 @@ venv/
 releases/
 data/
 raw/
+
+*.log

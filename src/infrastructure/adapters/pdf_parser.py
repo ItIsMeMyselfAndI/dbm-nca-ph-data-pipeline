@@ -4,6 +4,7 @@ from PyPDF2 import PdfReader, PdfWriter
 import pdfplumber
 from pdfplumber.page import Page
 
+from src.core.entities.metadata import MetaData
 from src.infrastructure.constants import TABLE_COLUMNS
 
 
@@ -18,6 +19,15 @@ class PDFParser:
             # "join_y_tolerance": 1,
         }
         pass
+
+    def get_metadata(self, storage_path: str) -> MetaData:
+        reader = PdfReader(storage_path)
+        meta = reader.metadata
+        metadata = MetaData(**{
+            "created_at": meta.get('/CreationDate'),  # pyright: ignore
+            "modified_at": meta.get('/ModDate')  # pyright: ignore
+        })
+        return metadata
 
     def split_pages(self, data: BytesIO) -> List[BytesIO]:
         data_list: List[BytesIO] = []
@@ -71,4 +81,3 @@ class PDFParser:
         # im = page.to_image()
         # im.debug_tablefinder(self.table_settings).show()
         # print(vert_lines)
-

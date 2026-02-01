@@ -5,6 +5,7 @@ from typing import List
 from core.interfaces.scraper import ScraperProvider
 from core.interfaces.storage import StorageProvider
 from src.core.entities.release import Release
+from src.core.interfaces.parser import ParserProvider
 from src.core.interfaces.repository import RepositoryProvider
 
 logger = logging.getLogger(__name__)
@@ -14,11 +15,13 @@ class IngestReleases:
     def __init__(self,
                  scraper: ScraperProvider,
                  storage: StorageProvider,
+                 parser: ParserProvider,
                  repository: RepositoryProvider,
                  base_raw_path: str,
                  base_releases_path: str):
         self.scraper = scraper
         self.storage = storage
+        self.parser = parser
         self.repository = repository
         self.base_raw_path = base_raw_path
         self.base_releases_path = base_releases_path
@@ -29,19 +32,13 @@ class IngestReleases:
 
         try:
             releases = self.scraper.get_releases(oldest_release_year)
+            logger.info(f"Found {len(releases)} releases")
         except Exception as e:
             logger.critical(f"Failed to fetch release list: {e}")
             raise e
 
-        logger.info(f"Found {len(releases)} releases")
-
-        filtered_releases = self._filter_new_or_updated_releases(releases)
-        logger.info(
-            f"Filtered only new/updated releases: "
-            f"{len(filtered_releases)}/{len(releases)} remained")
-
         success_count = 0
-        for release in filtered_releases:
+        for release in releases:
             storage_path = f"{self.base_raw_path}/{release.filename}"
             try:
                 self._ingest_release(storage_path, release)
@@ -50,7 +47,13 @@ class IngestReleases:
                 logger.error(f"Failed to ingest {storage_path}: {e}")
 
         logger.info(f"Ingestion complete. Successfully synced {
-                    success_count}/{len(filtered_releases)} files.")
+                    success_count}/{len(releases)} files.")
+
+        logger.info("Filtering new/modified releases...")
+        filtered_releases = self._filter_new_or_updated_releases(releases)
+        logger.info(
+            f"Filtered only new/updated releases: "
+            f"{len(filtered_releases)}/{len(releases)} remained")
 
         return filtered_releases
 
@@ -64,35 +67,39 @@ class IngestReleases:
 
     def _filter_new_or_updated_releases(self, releases: List[Release]):
         """
-            - if the database has a last release and its year matches
-                    the current year, it updates that release.
-            - if the last release is from a previous year, it adds
-                    all newer releases.
-            - if the database is empty, it initializes it with all
-                    available releases.
+            if db release empty
+                include all releases
+            else
+                for each release
+                    if stored release file metadata != db release metadata
+                        include release
         """
-        last_db_release = self.repository.get_last_release()
-        curr_year = datetime.now().year
         filtered_releases = []
+        for release in releases:
+            db_release = self.repository.get_release(release.id)
+            storage_path = f"{self.base_raw_path}/{release.filename}"
+            file_release_metadata = self.parser.get_metadata(storage_path)
 
-        if last_db_release:
+            release.file_meta_created_at = file_release_metadata.created_at
+            release.file_meta_modified_at = file_release_metadata.modified_at
 
-            # leave only the latest release & del db last release
-            if last_db_release.year == curr_year:
-                latest_release = max(releases, key=lambda x: x.year)
-                self.repository.delete_release(latest_release.id)
-                filtered_releases.append(latest_release)
+            if not db_release:
+                filtered_releases.append(release)
+                continue
+            if not file_release_metadata:
+                continue
 
-            # add all new/latest releases
+            has_changed = (
+                db_release.file_meta_created_at != file_release_metadata.created_at or
+                db_release.file_meta_modified_at != file_release_metadata.modified_at
+            )
+
+            if has_changed:
+                self.repository.delete_release(release.id)
+                logger.info(f"Update detected for {
+                            release.filename}. Re-processing...")
+                filtered_releases.append(release)
             else:
-                for release in releases:
-                    if release.year > last_db_release.year:
-                        filtered_releases.append(release)
-                else:
-                    logger.info("No new release found")
-
-        # initialize db w/ all releases
-        else:
-            filtered_releases = releases
+                logger.debug(f"No changes for {release.filename}. Skipping.")
 
         return filtered_releases
