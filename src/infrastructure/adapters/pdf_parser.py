@@ -29,6 +29,11 @@ class PDFParser:
         })
         return metadata
 
+    def display_page(self, page: Page):
+        print(self.table_settings["explicit_vertical_lines"])
+        im = page.to_image()
+        im.debug_tablefinder(self.table_settings).show()
+
     def split_pages(self, data: BytesIO) -> List[BytesIO]:
         data_list: List[BytesIO] = []
         reader = PdfReader(data)
@@ -57,6 +62,9 @@ class PDFParser:
                 rows = page.extract_table(self.table_settings)
                 if rows:
                     raw_rows.extend(rows)
+                # <test ----------->
+                # self.display_page(page)
+                # </test ----------->
 
         return raw_rows
 
@@ -78,6 +86,3 @@ class PDFParser:
         page_right_side_x = page.width - 1
         vert_lines.append(page_right_side_x)
         self.table_settings["explicit_vertical_lines"] = vert_lines
-        # im = page.to_image()
-        # im.debug_tablefinder(self.table_settings).show()
-        # print(vert_lines)

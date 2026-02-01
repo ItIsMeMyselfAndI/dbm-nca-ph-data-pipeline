@@ -1,10 +1,10 @@
 venv/
 *pycache*
 .env
-*egg-info/
+*egg-info*
 
 releases/
 data/
 raw/
 
-*.log
+*.log*

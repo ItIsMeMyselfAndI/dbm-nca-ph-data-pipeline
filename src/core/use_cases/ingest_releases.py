@@ -55,6 +55,9 @@ class IngestReleases:
             f"Filtered only new/updated releases: "
             f"{len(filtered_releases)}/{len(releases)} remained")
 
+        # <test ----------->
+        # return releases
+        # </test ----------->
         return filtered_releases
 
     def _ingest_release(self, storage_path: str, release: Release):

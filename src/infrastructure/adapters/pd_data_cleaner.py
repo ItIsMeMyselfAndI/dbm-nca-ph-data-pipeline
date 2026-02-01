@@ -22,6 +22,7 @@ class PdDataCleaner:
                        release_id: str,
                        ) -> NCAData:
         df = self._convert_raw_to_df(raw_rows)
+        df = self._insert_nca_group_spacers(df)
 
         df["nca_number"] = df["nca_number"].replace('', np.nan)
         df["nca_number"] = df["nca_number"].ffill()
@@ -41,9 +42,8 @@ class PdDataCleaner:
 
         df_records = self._create_df_records(df)
 
-        if df.shape[0] < 1:
+        if df_records.shape[0] < 1:
             return NCAData(records=[], allocations=[])
-
         df_allocations = self._create_df_allocations(df)
 
         records = self._convert_df_to_object_list(df_records,
@@ -52,6 +52,33 @@ class PdDataCleaner:
                                                       Allocation)
         data = NCAData(records=records, allocations=allocations)
         return data
+
+    def _insert_nca_group_spacers(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+            Only add a spacer if:
+            1. prev nca num is not empty
+            2. nca num changed
+            3. both current and last are not empty
+        """
+        new_rows = []
+        last_nca = None
+
+        for _, row in df.iterrows():
+            current_nca = row["nca_number"]
+
+            # Use pd.isna() for the most reliable null-checking in DataFrames
+            curr_is_valid = pd.notna(current_nca) and str(current_nca).strip() != ""
+            last_is_valid = pd.notna(last_nca) and str(last_nca).strip() != ""
+
+            if last_is_valid and curr_is_valid and current_nca != last_nca:
+                # Adding the spacer
+                empty_row = pd.Series([""] * len(df.columns), index=df.columns)
+                new_rows.append(empty_row)
+
+            new_rows.append(row)
+            last_nca = current_nca
+
+        return pd.DataFrame(new_rows).reset_index(drop=True)
 
     def _convert_raw_to_df(self, raw_rows: List[List[str | None]]):
         table_header = [item.lower().replace(
@@ -79,15 +106,16 @@ class PdDataCleaner:
                 if row all Nan: push row to allocations
                 else: concatenate row items to allocations[-1] items
         """
+        df = self._insert_nca_group_spacers(df)
         new_df = pd.DataFrame(df[self.allocation_columns])
         new_df = new_df.explode(self.allocation_columns[1:], ignore_index=True)
-        new_df = new_df.fillna("")
         df_allocations = [new_df.iloc[0]]
         for _, row in new_df.iloc[1:].iterrows():
             if (row[self.allocation_columns[1:]] == "").all():
                 df_allocations.append(row)
             else:
                 last_idx = len(df_allocations) - 1
+                df_allocations[last_idx]["nca_number"] = row["nca_number"]
                 df_allocations[last_idx]["agency"] += " " + row["agency"]
                 df_allocations[last_idx]["operating_unit"] += " " + \
                     row["operating_unit"]

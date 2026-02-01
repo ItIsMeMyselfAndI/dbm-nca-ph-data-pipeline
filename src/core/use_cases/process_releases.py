@@ -99,6 +99,12 @@ class ProcessReleases:
                       leave=False):
             filename = f"{release.filename.split(".")[0]}/page_{i}.pdf"
             raw_release_page_path = f"{self.base_releases_path}/{filename}"
+            # <test ----------->
+            # if i == 0 or (raw_release_page_path == "data/releases/NCA_2024/page_1769.pdf"):
+            #     pass
+            # else:
+            #     continue
+            # </test ----------->
 
             try:
                 data = self.storage.load_file(raw_release_page_path)
