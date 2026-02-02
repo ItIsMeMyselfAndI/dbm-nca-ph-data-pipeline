@@ -1,3 +1,4 @@
+boto3==1.42.39
 bs4==0.0.2
 chardet==5.2.0
 dbm-nca-ph-etl==0.1.0

@@ -13,9 +13,7 @@ class ParserProvider(Protocol):
         """split multi-page file into single-page pdfs"""
         ...
 
-    def extract_raw_table_rows(self,
-                               data: BytesIO,
-                               page_num: int,
-                               ) -> List[List[str | None]]:
-        """extract file table/s and return list of string lists"""
+    def extract_tables(self, data: BytesIO,
+                       ) -> List[List[str | None]]:
+        """extract file table/s and return list of string/none lists"""
         ...

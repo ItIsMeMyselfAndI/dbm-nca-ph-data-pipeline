@@ -1,5 +1,4 @@
 from copy import Error
-from datetime import datetime
 import logging
 from typing import List
 from core.interfaces.scraper import ScraperProvider
@@ -11,7 +10,7 @@ from src.core.interfaces.repository import RepositoryProvider
 logger = logging.getLogger(__name__)
 
 
-class IngestReleases:
+class ScrapeReleases:
     def __init__(self,
                  scraper: ScraperProvider,
                  storage: StorageProvider,
@@ -27,8 +26,7 @@ class IngestReleases:
         self.base_releases_path = base_releases_path
 
     def run(self, oldest_release_year: int = 2024) -> List[Release]:
-        logger.info(f"Starting ingestion for releases since {
-                    oldest_release_year}")
+        logger.info(f"Scraping for releases since {oldest_release_year}...")
 
         try:
             releases = self.scraper.get_releases(oldest_release_year)
@@ -41,12 +39,12 @@ class IngestReleases:
         for release in releases:
             storage_path = f"{self.base_raw_path}/{release.filename}"
             try:
-                self._ingest_release(storage_path, release)
+                self._save_release(storage_path, release)
                 success_count += 1
             except Exception as e:
                 logger.error(f"Failed to ingest {storage_path}: {e}")
 
-        logger.info(f"Ingestion complete. Successfully synced {
+        logger.info(f"Successfully synced {
                     success_count}/{len(releases)} files.")
 
         logger.info("Filtering new/modified releases...")
@@ -60,7 +58,7 @@ class IngestReleases:
         # </test ----------->
         return filtered_releases
 
-    def _ingest_release(self, storage_path: str, release: Release):
+    def _save_release(self, storage_path: str, release: Release):
         data = self.scraper.download_release(release)
         if data.getbuffer().nbytes == 0:
             raise Error("Downloaded file is empty.")

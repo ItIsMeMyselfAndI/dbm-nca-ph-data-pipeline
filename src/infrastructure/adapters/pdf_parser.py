@@ -48,15 +48,13 @@ class PDFParser:
 
         return data_list
 
-    def extract_raw_table_rows(self,
-                               data: BytesIO,
-                               page_num: int,
-                               ) -> List[List[str | None]]:
+    def extract_tables(self, data: BytesIO,
+                       ) -> List[List[str | None]]:
         raw_rows: List[List[str | None]] = []
 
         with pdfplumber.open(data) as pdf:
-            for page in pdf.pages:
-                if page_num == 0:
+            for i, page in enumerate(pdf.pages):
+                if i == 0:
                     self._update_table_settings_vert_lines(page)
 
                 rows = page.extract_table(self.table_settings)

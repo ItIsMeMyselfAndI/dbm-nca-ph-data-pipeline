@@ -28,4 +28,3 @@ class LocalStorage:
     def _create_base_dirs(self):
         os.makedirs(self.abs_raw_path, exist_ok=True)
         os.makedirs(self.abs_releases_path, exist_ok=True)
-
