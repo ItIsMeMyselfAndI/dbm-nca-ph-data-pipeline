@@ -1,4 +1,4 @@
-from src.core.entities.page_raw_table import PageRawTable
+from src.core.entities.release_page_queue_body import ReleasePageQueueBody
 from src.core.interfaces.queue import QueueProvider
 
 
@@ -7,5 +7,5 @@ class QeueuData:
         self.queue = queue
         pass
 
-    def run(self, data: PageRawTable):
+    def run(self, data: ReleasePageQueueBody):
         self.queue.send_data(data)

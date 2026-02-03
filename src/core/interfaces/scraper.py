@@ -1,6 +1,6 @@
 from io import BytesIO
 from typing import List, Protocol
-from core.entities.release import Release
+from src.core.entities.release import Release
 
 
 class ScraperProvider(Protocol):

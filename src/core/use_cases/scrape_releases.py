@@ -2,8 +2,9 @@ from copy import Error
 from io import BytesIO
 import logging
 from typing import List, Tuple
-from core.interfaces.scraper import ScraperProvider
-from core.interfaces.storage import StorageProvider
+
+from src.core.interfaces.scraper import ScraperProvider
+from src.core.interfaces.storage import StorageProvider
 from src.core.entities.release import Release
 from src.core.interfaces.parser import ParserProvider
 from src.core.interfaces.repository import RepositoryProvider

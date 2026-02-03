@@ -9,8 +9,9 @@ class Settings(BaseSettings):
     AWS_PROFILE: Optional[str] = None
     AWS_REGION: Optional[str] = "ap-southeast-1"
 
-    SQS_QUEUE_URL: Optional[str] = None
-    S3_BUCKET_NAME: Optional[str] = None
+    AWS_SQS_QUEUE_URL: str
+    AWS_S3_BUCKET_NAME: str
+    AWS_LAMBDA_FUNCTION_NAME: str
 
     # AWS_ACCESS_KEY_ID: Optional[str] = None
     # AWS_SECRET_ACCESS_KEY: Optional[str] = None

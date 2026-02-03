@@ -6,8 +6,8 @@ from typing import List
 from bs4 import BeautifulSoup
 import requests
 
-from core.entities.release import Release
-from infrastructure.constants import BASE_URL, NCA_PAGE
+from src.core.entities.release import Release
+from src.infrastructure.constants import BASE_URL, NCA_PAGE
 from src.core.interfaces.scraper import ScraperProvider
 
 

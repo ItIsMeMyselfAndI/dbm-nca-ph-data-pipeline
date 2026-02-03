@@ -1,8 +1,16 @@
 import logging.config
 import sys
+import os
 
 
 def setup_logging():
+    is_lambda = os.environ.get("AWS_LAMBDA_FUNCTION_NAME") is not None
+
+    handlers_list = ["console"]
+
+    if not is_lambda:
+        handlers_list.append("file")
+
     LOG_CONFIG = {
         "version": 1,
         "disable_existing_loggers": False,
@@ -27,7 +35,7 @@ def setup_logging():
         },
         "loggers": {
             "": {  # root logger
-                "handlers": ["console", "file"],
+                "handlers": handlers_list,
                 "level": "INFO",
                 "propagate": True,
             },
