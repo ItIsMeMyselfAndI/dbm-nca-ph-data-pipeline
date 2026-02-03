@@ -41,9 +41,8 @@ class ScrapeReleases:
         logger.info("Filtering new/modified releases...")
         filtered_releases, filtered_data = \
             self._filter_new_or_updated_releases(releases)
-        logger.info(
-            f"Filtered only new/updated releases: "
-            f"{len(filtered_releases)}/{len(releases)} remained")
+        logger.info(f"Filtered only new/updated releases: "
+                    f"{len(filtered_releases)}/{len(releases)} remained")
 
         # save
         success_count = 0
@@ -63,8 +62,8 @@ class ScrapeReleases:
                 logger.error(f"Failed to sync "
                              f"{filtered_releases[i].filename}: {e}")
 
-        logger.info(f"Successfully synced {
-                    success_count}/{len(releases)} files.")
+        logger.info(f"Successfully synced {success_count}/"
+                    f"{len(filtered_releases)} filtered releases.")
 
         # <test ----------->
         # return releases
@@ -85,28 +84,36 @@ class ScrapeReleases:
                                         ) -> Tuple[List[Release],
                                                    List[BytesIO]]:
         """
-            if db release empty
+            if db release or storage release is empty
                 include all releases
             else
                 for each release
-                    if stored release file metadata != db release metadata
+                    if modified:
                         include release
         """
         filtered_releases = []
         filtered_data = []
+
         for release in releases:
             db_release = self.repository.get_release(release.id)
-            data = self.scraper.download_release(release)
-            file_release_metadata = self.parser.get_metadata_by_data(data)
+            storage_release = self.storage.load_file(release.filename)
 
-            if not db_release:
+            data = self.scraper.download_release(release)
+
+            file_release_metadata = self.parser.get_metadata_by_data(data)
+            data.seek(0)
+
+            if not db_release or not storage_release:
                 filtered_releases.append(release)
                 filtered_data.append(data)
+                logger.info(f"Release not found. "
+                            f"Added to filtered releases: "
+                            f"{release.filename}")
                 continue
+
             if not file_release_metadata:
-                self.storage.save_file(release.filename, data)
-                filtered_releases.append(release)
-                filtered_data.append(data)
+                logger.info(f"Skipped - Scraped release has no "
+                            f"metadata: {release.filename}")
                 continue
 
             release.file_meta_created_at = file_release_metadata.created_at

@@ -4,7 +4,6 @@ import sys
 from tqdm import tqdm
 from datetime import timedelta
 from src.infrastructure.adapters.s3_storage import S3Storage
-from src.infrastructure.config import settings
 from src.logging_config import setup_logging
 
 from src.core.use_cases.extract_page_table import ExtractPageTable
@@ -29,7 +28,8 @@ logger = logging.getLogger(__name__)
 
 # adapters
 scraper = NCAScraper()
-storage = LocalStorage(base_storage_path=BASE_STORAGE_PATH)
+# storage = LocalStorage(base_storage_path=BASE_STORAGE_PATH)
+storage = S3Storage(base_storage_path=BASE_STORAGE_PATH)
 parser = PDFParser()
 queue = MockQueue()
 data_cleaner = PdDataCleaner(allocation_comumns=ALLOCATION_COLUMNS,

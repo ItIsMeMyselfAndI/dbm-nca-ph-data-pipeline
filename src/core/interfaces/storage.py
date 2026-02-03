@@ -12,6 +12,6 @@ class StorageProvider(Protocol):
         """saves data to the destination (s3, disk, etc)"""
         ...
 
-    def load_file(self, filename: str) -> BytesIO:
+    def load_file(self, filename: str) -> BytesIO | None:
         """load data into memory"""
         ...

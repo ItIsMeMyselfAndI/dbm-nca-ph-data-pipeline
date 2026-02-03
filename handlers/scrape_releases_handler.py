@@ -1,7 +1,6 @@
 import logging
 
 from src.infrastructure.adapters.sqs_queue import SQSQueue
-from src.infrastructure.config import settings
 from src.logging_config import setup_logging
 
 from src.core.use_cases.scrape_releases import ScrapeReleases
@@ -17,10 +16,9 @@ logger = logging.getLogger(__name__)
 
 # adapters
 scraper = NCAScraper()
-storage = S3Storage(bucket_name=settings.AWS_S3_BUCKET_NAME,
-                    base_storage_path=BASE_STORAGE_PATH)
+storage = S3Storage(base_storage_path=BASE_STORAGE_PATH)
 parser = PDFParser()
-queue = SQSQueue(queue_url=settings.AWS_SQS_RELEASE_QUEUE_URL)
+queue = SQSQueue()
 repository = SupabaseRepository(db_bulk_size=DB_BULK_SIZE)
 
 # use cases

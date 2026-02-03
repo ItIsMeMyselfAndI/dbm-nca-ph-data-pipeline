@@ -18,15 +18,20 @@ class LocalStorage(StorageProvider):
 
     def save_file(self, filename: str, data: BytesIO) -> None:
         self._create_base_dirs()
-        data.seek(0)
+        data_copy = BytesIO(data.getvalue())
+        data_copy.seek(0)
         full_path = self.get_filename_full_path(filename)
         with open(full_path, 'wb') as f:
-            f.write(data.read())
+            f.write(data_copy.read())
 
-    def load_file(self, filename: str) -> BytesIO:
+    def load_file(self, filename: str) -> BytesIO | None:
         full_path = self.get_filename_full_path(filename)
-        with open(full_path, 'rb') as f:
-            return BytesIO(f.read())
+        try:
+            with open(full_path, 'rb') as f:
+                return BytesIO(f.read())
+
+        except Exception:
+            return None
 
     def _create_base_dirs(self):
         if not self.base_storage_path:

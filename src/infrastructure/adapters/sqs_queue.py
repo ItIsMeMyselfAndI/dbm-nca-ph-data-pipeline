@@ -11,14 +11,9 @@ logger = logging.getLogger(__name__)
 
 
 class SQSQueue(QueueProvider):
-    def __init__(self, queue_url: str):
-        self.sqs = boto3.client(
-            'sqs',
-            region_name=settings.AWS_REGION,
-            # aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-            # aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-        )
-        self.queue_url = queue_url
+    def __init__(self):
+        self.sqs = boto3.client('sqs')
+        self.queue_url = settings.AWS_SQS_RELEASE_QUEUE_URL
 
     def send_data(self, data: Release | QueueReleasePageBody) -> None:
         try:
