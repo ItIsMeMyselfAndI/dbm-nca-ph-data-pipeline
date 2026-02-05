@@ -3,12 +3,12 @@ import logging
 import sys
 from tqdm import tqdm
 from datetime import timedelta
+from src.core.use_cases.load_allocations_and_records_to_db import LoadRecordsAndAllocationsToDB
 from src.core.use_cases.queue_release_page import QueueReleasePage
 from src.infrastructure.adapters.s3_storage import S3Storage
 from src.logging_config import setup_logging
 
 from src.core.use_cases.extract_page_table import ExtractPageTable
-from src.core.use_cases.load_release import LoadRelease
 from src.core.use_cases.scrape_releases import ScrapeReleases
 from src.infrastructure.adapters.mock_queue import MockQueue
 from src.infrastructure.adapters.supabase_repository import SupabaseRepository
@@ -21,6 +21,10 @@ from src.infrastructure.constants import (ALLOCATION_COLUMNS,
                                           DB_BULK_SIZE,
                                           RECORD_COLUMNS,
                                           VALID_COLUMNS)
+
+# <test>
+MAX_PAGE_COUNT_TO_PUBISH = 5
+# </test>
 
 
 setup_logging()
@@ -49,16 +53,16 @@ queue_release_job = QueueReleasePage(storage=storage,
                                      repository=repository)
 extract_job = ExtractPageTable(storage=storage,
                                parser=parser)
-load_job = LoadRelease(data_cleaner=data_cleaner,
-                       repository=repository,)
+clean_job = PdDataCleaner(allocation_comumns=ALLOCATION_COLUMNS,
+                          record_columns=RECORD_COLUMNS,
+                          valid_columns=VALID_COLUMNS)
+load_job = LoadRecordsAndAllocationsToDB(data_cleaner=data_cleaner,
+                                         repository=repository,)
 
 
 def main():
     logger.info("Initializing NCA Pipeline...")
 
-    # init adapters
-    logger.debug("Setting up adapters...")
-    # excute
     try:
         logger.info("Starting Scraping Job...")
         releases = scrape_job.run(oldest_release_year=2024)
@@ -66,33 +70,37 @@ def main():
 
         logger.info("Starting Processing Job...")
         for release in releases:
-            logger.info(f"Extracting & Loading "
+            logger.info(f"Processing & Loading "
                         f"{release.filename} raw data to db...")
 
             prev_time = time.time()
             for page_num in tqdm(range(release.page_count),
-                                 desc="Extracting/Loading", unit="file"):
-                # queue release page
+                                 desc="Processing/Loading", unit="file"):
+                # queue
                 queue_release_job.run(release, page_num)
 
-                # clean release page data
-                table = extract_job.run(release.filename, page_num)
-                if not table:
-                    logger.warning(f"Skipped extracting {release.filename} "
-                                   f"page-{page_num}: Table Not Found")
+                # extract
+                extracted_table = extract_job.run(release.filename, page_num)
+
+                if not extracted_table:
+                    logger.warning(f"Skipped: No table extracted for release "
+                                   f"{release.id} page-{page_num}")
                     continue
 
-                # load data
-                load_job.run(release, table)
+                # clean
+                cleaned_table = clean_job.clean_raw_data(extracted_table.rows,
+                                                         release.id)
+                # load
+                load_job.run(release, cleaned_table, page_num)
 
                 # <test>
-                if page_num > 5:
+                if page_num > MAX_PAGE_COUNT_TO_PUBISH and not None:
                     break
                 # </test>
 
             elapsed = str(timedelta(seconds=time.time() -
                                     prev_time)).split(":")
-            logger.info(f"Loaded complete in "
+            logger.info(f"Processing & Loading complete in "
                         f"{elapsed[0]}h "
                         f"{elapsed[1]}m "
                         f"{elapsed[2]}s: "

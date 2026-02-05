@@ -1,17 +1,20 @@
-import json
-import logging
-
-from src.core.entities.release import Release
-from src.core.use_cases.queue_release_page import QueueReleasePage
-from src.infrastructure.adapters.sqs_queue import SQSQueue
-from src.infrastructure.config import settings
-from src.logging_config import setup_logging
-
-from src.infrastructure.adapters.s3_storage import S3Storage
-from src.infrastructure.adapters.pdf_parser import PDFParser
-from src.infrastructure.adapters.supabase_repository import SupabaseRepository
 from src.infrastructure.constants import (BASE_STORAGE_PATH,
                                           DB_BULK_SIZE)
+from src.infrastructure.adapters.supabase_repository import SupabaseRepository
+from src.infrastructure.adapters.pdf_parser import PDFParser
+from src.infrastructure.adapters.s3_storage import S3Storage
+from src.logging_config import setup_logging
+from src.infrastructure.config import settings
+from src.infrastructure.adapters.sqs_queue import SQSQueue
+from src.core.use_cases.queue_release_page import QueueReleasePage
+from src.core.entities.release import Release
+import logging
+import json
+
+# <test>
+MAX_PAGE_COUNT_TO_PUBISH = 5
+# </test>
+
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -32,7 +35,7 @@ queue_pages_job = QueueReleasePage(storage=storage,
 def lambda_handler(event, context):
     try:
         releases = []
-        sucess_count = 0
+        success_count = 0
         total_releases = len(event['Records'])
 
         for record in event['Records']:
@@ -47,12 +50,12 @@ def lambda_handler(event, context):
                     queue_pages_job.run(release, i)
 
                     # <test>
-                    if i > 5:
+                    if i > MAX_PAGE_COUNT_TO_PUBISH and not None:
                         break
                     # </test>
 
                 releases.append(release.filename)
-                sucess_count += 1
+                success_count += 1
                 logger.info(f"Successfully queued pages for "
                             f"release: {release.filename}")
 
@@ -63,11 +66,13 @@ def lambda_handler(event, context):
     except Exception as e:
         logger.critical(f"Release pages queuing job "
                         f"failed: {e}", exc_info=True)
-        return {"status": "error", "message": str(e)}
+        return {"statusCode": 400,
+                "body": "Release pages queuing job failed."}
 
     return {
         'statusCode': 200,
-        'body': (f"Release pages queuing job "
-                 f"completed successfully: "
-                 f"{sucess_count}/{total_releases} releases processed.")
+        'body': {
+            "filterd_releases_count": success_count,
+            "total_releases_count": total_releases,
+        }
     }

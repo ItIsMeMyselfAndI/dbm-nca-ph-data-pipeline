@@ -37,7 +37,12 @@ def lambda_handler(event, context):
 
     except Exception as e:
         logger.critical(f"Scraping job failed: {e}", exc_info=True)
-        return {"status": "error", "message": str(e)}
+        return {"statusCode": 400, "body": "Scraping job failed."}
 
     logger.info("Job completed successfully.")
-    return {"status": "success", "releases_processed": len(releases)}
+    return {
+        "statusCode": 200,
+        "body": {
+            "total_releases_count": len(releases),
+        }
+    }

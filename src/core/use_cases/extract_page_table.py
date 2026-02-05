@@ -33,10 +33,10 @@ class ExtractPageTable:
             return None
 
         rows = self.parser.extract_table_by_page_num(raw_data, page_num)
-        raw_table = RawPageTable(
+        table = RawPageTable(
             rows=rows,
             page_num=page_num
         )
 
         logger.debug(f"Extraction complete for page-{page_num}")
-        return raw_table
+        return table

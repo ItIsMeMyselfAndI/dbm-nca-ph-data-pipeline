@@ -70,15 +70,6 @@ class ScrapeReleases:
         # </test ----------->
         return filtered_releases
 
-    def _save_release(self, release: Release, data: BytesIO) -> int:
-        if data.getbuffer().nbytes == 0:
-            raise Error("Downloaded file is empty.")
-
-        self.storage.save_file(release.filename, data)
-        logger.info(f"Synced: {release.filename}")
-        page_count = self.parser.get_page_count(data)
-        return page_count
-
     def _filter_new_or_updated_releases(self,
                                         releases: List[Release]
                                         ) -> Tuple[List[Release],
@@ -103,22 +94,6 @@ class ScrapeReleases:
             file_release_metadata = self.parser.get_metadata_by_data(data)
             data.seek(0)
 
-            if not db_release:
-                filtered_releases.append(release)
-                filtered_data.append(data)
-                logger.info(f"Release not found in DB. "
-                            f"Added to filtered releases: "
-                            f"{release.filename}")
-                continue
-
-            if not storage_release:
-                filtered_releases.append(release)
-                filtered_data.append(data)
-                logger.info(f"Release not found in Storage. "
-                            f"Added to filtered releases: "
-                            f"{release.filename}")
-                continue
-
             if not file_release_metadata:
                 logger.info(f"Skipped - Scraped release has no "
                             f"metadata: {release.filename}")
@@ -126,6 +101,20 @@ class ScrapeReleases:
 
             release.file_meta_created_at = file_release_metadata.created_at
             release.file_meta_modified_at = file_release_metadata.modified_at
+
+            if not db_release:
+                filtered_releases.append(release)
+                filtered_data.append(data)
+                logger.info(f"Release not found in DB. "
+                            f"To be a added: {release.filename}")
+                continue
+
+            if not storage_release:
+                filtered_releases.append(release)
+                filtered_data.append(data)
+                logger.info(f"Release not found in Storage. "
+                            f"To be a added: {release.filename}")
+                continue
 
             has_changed = (
                 db_release.file_meta_created_at !=
@@ -145,3 +134,13 @@ class ScrapeReleases:
                 logger.debug(f"No changes for {release.filename}. Skipping.")
 
         return filtered_releases, filtered_data
+
+    def _save_release(self, release: Release, data: BytesIO) -> int:
+        if data.getbuffer().nbytes == 0:
+            raise Error("Downloaded file is empty.")
+
+        self.storage.save_file(release.filename, data)
+        self.repository.upsert_release(release)
+        logger.info(f"Synced storage & db: {release.filename}")
+        page_count = self.parser.get_page_count(data)
+        return page_count
