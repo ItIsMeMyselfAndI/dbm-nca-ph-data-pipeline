@@ -13,7 +13,7 @@ from src.core.interfaces.repository import RepositoryProvider
 logger = logging.getLogger(__name__)
 
 
-class ScrapeReleases:
+class ScrapeAndQueueReleases:
     def __init__(self,
                  scraper: ScraperProvider,
                  storage: StorageProvider,

@@ -5,14 +5,14 @@ from tqdm import tqdm
 from datetime import timedelta
 from src.core.use_cases.load_allocations_and_records_to_db import LoadRecordsAndAllocationsToDB
 from src.core.use_cases.queue_release_page import QueueReleasePage
+from src.core.use_cases.scrape_and_queue_releases import ScrapeAndQueueReleases
 from src.infrastructure.adapters.s3_storage import S3Storage
 from src.logging_config import setup_logging
 
 from src.core.use_cases.extract_page_table import ExtractPageTable
-from src.core.use_cases.scrape_releases import ScrapeReleases
 from src.infrastructure.adapters.mock_queue import MockQueue
 from src.infrastructure.adapters.supabase_repository import SupabaseRepository
-from src.infrastructure.adapters.local_storage import LocalStorage
+# from src.infrastructure.adapters.local_storage import LocalStorage
 from src.infrastructure.adapters.nca_scraper import NCAScraper
 from src.infrastructure.adapters.pd_data_cleaner import PdDataCleaner
 from src.infrastructure.adapters.pdf_parser import PDFParser
@@ -42,15 +42,12 @@ data_cleaner = PdDataCleaner(allocation_comumns=ALLOCATION_COLUMNS,
 repository = SupabaseRepository(db_bulk_size=DB_BULK_SIZE)
 
 # use cases
-scrape_job = ScrapeReleases(scraper=scraper,
-                            storage=storage,
-                            parser=parser,
-                            queue=queue,
-                            repository=repository,)
-queue_release_job = QueueReleasePage(storage=storage,
-                                     parser=parser,
-                                     queue=queue,
-                                     repository=repository)
+scrape_and_queue_job = ScrapeAndQueueReleases(scraper=scraper,
+                                              storage=storage,
+                                              parser=parser,
+                                              queue=queue,
+                                              repository=repository,)
+queue_job = QueueReleasePage(queue=queue)
 extract_job = ExtractPageTable(storage=storage,
                                parser=parser)
 clean_job = PdDataCleaner(allocation_comumns=ALLOCATION_COLUMNS,
@@ -65,7 +62,7 @@ def main():
 
     try:
         logger.info("Starting Scraping Job...")
-        releases = scrape_job.run(oldest_release_year=2024)
+        releases = scrape_and_queue_job.run(oldest_release_year=2024)
         logger.info("Job completed successfully.")
 
         logger.info("Starting Processing Job...")
@@ -77,7 +74,7 @@ def main():
             for page_num in tqdm(range(release.page_count),
                                  desc="Processing/Loading", unit="file"):
                 # queue
-                queue_release_job.run(release, page_num)
+                queue_job.run(release, page_num)
 
                 # extract
                 extracted_table = extract_job.run(release.filename, page_num)
@@ -94,7 +91,7 @@ def main():
                 load_job.run(release, cleaned_table, page_num)
 
                 # <test>
-                if page_num > MAX_PAGE_COUNT_TO_PUBISH and not None:
+                if page_num == MAX_PAGE_COUNT_TO_PUBISH and not None:
                     break
                 # </test>
 

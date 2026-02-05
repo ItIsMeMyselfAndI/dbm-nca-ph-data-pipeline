@@ -1,8 +1,3 @@
-from src.infrastructure.constants import (BASE_STORAGE_PATH,
-                                          DB_BULK_SIZE)
-from src.infrastructure.adapters.supabase_repository import SupabaseRepository
-from src.infrastructure.adapters.pdf_parser import PDFParser
-from src.infrastructure.adapters.s3_storage import S3Storage
 from src.logging_config import setup_logging
 from src.infrastructure.config import settings
 from src.infrastructure.adapters.sqs_queue import SQSQueue
@@ -20,16 +15,10 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 # adapters
-storage = S3Storage(base_storage_path=BASE_STORAGE_PATH)
-parser = PDFParser()
 queue = SQSQueue(queue_url=settings.AWS_SQS_RELEASE_PAGE_QUEUE_URL)
-repository = SupabaseRepository(db_bulk_size=DB_BULK_SIZE)
 
 # use case
-queue_pages_job = QueueReleasePage(storage=storage,
-                                   parser=parser,
-                                   queue=queue,
-                                   repository=repository)
+queue_job = QueueReleasePage(queue=queue)
 
 
 def lambda_handler(event, context):
@@ -47,10 +36,10 @@ def lambda_handler(event, context):
                 release = Release(**payload)
 
                 for i in range(release.page_count):
-                    queue_pages_job.run(release, i)
+                    queue_job.run(release, i)
 
                     # <test>
-                    if i > MAX_PAGE_COUNT_TO_PUBISH and not None:
+                    if i == MAX_PAGE_COUNT_TO_PUBISH and not None:
                         break
                     # </test>
 
