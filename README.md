@@ -45,17 +45,30 @@ The pipeline follows a **Fan-Out / Worker** pattern to handle high-volume docume
 
 ### Core Logic
 
+![Python](https://img.shields.io/badge/python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Pandas](https://img.shields.io/badge/pandas-%23150458.svg?style=for-the-badge&logo=pandas&logoColor=white)
+![NumPy](https://img.shields.io/badge/numpy-%23013243.svg?style=for-the-badge&logo=numpy&logoColor=white)
+![Pydantic](https://img.shields.io/badge/Pydantic-E92063?style=for-the-badge&logo=pydantic&logoColor=white)
+
 * **Language:** Python 3.14+
 * **Data Processing:** Pandas, NumPy, pdfplumber
 * **Architecture:** Clean Architecture (Domain-Driven Design)
 
 ### Infrastructure (AWS)
 
+![AWS](https://img.shields.io/badge/AWS-%23FF9900.svg?style=for-the-badge&logo=amazon-aws&logoColor=white)
+![AWS Lambda](https://img.shields.io/badge/Lambda-FF9900?style=for-the-badge&logo=aws-lambda&logoColor=white)
+![AWS S3](https://img.shields.io/badge/S3-569A31?style=for-the-badge&logo=amazons3&logoColor=white)
+![AWS SQS](https://img.shields.io/badge/SQS-FF4F8B?style=for-the-badge&logo=amazonsqs&logoColor=white)
+
 * **Compute:** AWS Lambda (3 Functions: Scraper, Splitter, Worker)
 * **Storage:** AWS S3 (Raw Data Lake)
 * **Messaging:** AWS SQS (Standard Queues)
 
 ### Database
+
+![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
 
 * **Primary DB:** Supabase (PostgreSQL)
 
