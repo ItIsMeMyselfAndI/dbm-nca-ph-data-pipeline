@@ -1,7 +1,3 @@
-Here is the final, complete `README.md`. I have added the **Installation** section at the beginning so users know how to clone the repo and install dependencies before they try to run anything.
-
----
-
 # DBM NCA Data Pipeline
 
 A serverless ETL (Extract, Transform, Load) pipeline designed to automate the scraping, processing, and storage of Notice of Cash Allocation (NCA) documents from the Philippine Department of Budget and Management (DBM).
