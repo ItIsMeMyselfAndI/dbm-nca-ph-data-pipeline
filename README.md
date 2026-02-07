@@ -4,6 +4,29 @@ A serverless ETL (Extract, Transform, Load) pipeline designed to automate the sc
 
 This project focuses exclusively on the **ingestion layer**: it autonomously monitors the DBM website and populates a **Supabase** database.
 
+
+Here is the **Table of Contents** to place at the top of your `README.md`, right after the project description.
+
+## 📖 Table of Contents
+
+* [Key Features](https://www.google.com/search?q=%23-key-features)
+* [Architecture](https://www.google.com/search?q=%23-architecture)
+* [Data Flow Breakdown](https://www.google.com/search?q=%23data-flow-breakdown)
+
+
+* [Tech Stack](https://www.google.com/search?q=%23-tech-stack)
+* [Project Structure](https://www.google.com/search?q=%23-project-structure)
+* [Installation](https://www.google.com/search?q=%23-installation)
+* [Environment Variables](https://www.google.com/search?q=%23-environment-variables)
+* [Database Setup](https://www.google.com/search?q=%23-database-setup)
+* [How to Run](https://www.google.com/search?q=%23-how-to-run)
+* [A. Locally](https://www.google.com/search?q=%23a-locally)
+* [B. AWS Deployment (Manual)](https://www.google.com/search?q=%23b-aws-deployment-manual)
+* [1. Infrastructure Setup](https://www.google.com/search?q=%231-infrastructure-setup-one-time)
+* [2. Packaging & Updating Code](https://www.google.com/search?q=%232-packaging--updating-code)
+
+---
+
 ## 🚀 Key Features
 
 * **Serverless Architecture:** Fully serverless execution using **AWS Lambda** to minimize idle costs and scale automatically.
@@ -16,7 +39,7 @@ This project focuses exclusively on the **ingestion layer**: it autonomously mon
 
 The pipeline follows a **Fan-Out / Worker** pattern to handle high-volume document processing:
 
-![Pipeline Architecture](./dbm-nca-ph-pipeline.png)
+![Pipeline Architecture Diagram](./dbm-nca-ph-pipeline.png)
 
 ### Data Flow Breakdown
 
@@ -232,19 +255,59 @@ python main.py
 
 ### B. AWS Deployment (Manual)
 
-To deploy or update the Lambda functions, you must package the dependencies, source code, and handler into a single zip file for each function.
+To deploy or update the Lambda functions, you must first create the infrastructure and then package the code manually.
 
-**Repeat this process for each of the 3 handlers:**
+#### 1. Infrastructure Setup (One-Time)
+
+Before deploying code, create the following resources in your AWS Console:
+
+1. **S3 Bucket:** Create a bucket for storing PDFs.
+* *Note the name for `AWS_S3_BUCKET_NAME` environment variable.*
+
+
+2. **SQS Queue A:** Create a standard queue for release metadata.
+* *Note the URL for `AWS_SQS_RELEASE_QUEUE_URL` environment variable.*
+
+
+3. **SQS Queue B:** Create a standard queue for page metadata.
+* *Note the URL for `AWS_SQS_RELEASE_PAGE_QUEUE_URL` environment variable.*
+
+
+4. **Lambda A (Scraper):** Create a function named **`dbmReleasesScraperAndPublisher`**.
+* *Runtime:* Python 3.14
+
+
+5. **Lambda B (Orchestrator):** Create a function named **`dbmReleasePagesPublisher`**.
+* *Runtime:* Python 3.14
+* *Trigger:* Add **SQS Queue A** as the trigger.
+
+
+6. **Lambda C (Worker):** Create a function named **`dbmReleasePageProcessorAndLoader`**.
+* *Runtime:* Python 3.14
+* *Trigger:* Add **SQS Queue B** as the trigger.
+
+
+
+#### 2. Packaging & Updating Code
+
+Repeat this process for **each of the 3 handlers**:
 
 1. **Prepare a Build Folder:**
 Create a clean, temporary folder for the specific function you are deploying (e.g., `dist/build_scraper`).
 2. **Copy Source Code:**
 Copy the entire `src/` directory into your build folder.
-3. **Copy Handler:**
+3. **Copy & Rename Handler:**
 Copy the specific handler file from `handlers/` to the build folder and **rename it** to `lambda_function.py`.
+```bash
+# Example: Renaming the Scraper Handler
+cp handlers/releases_scraper_and_publisher.py dist/build_scraper/lambda_function.py
+
+```
+
+
 4. **Define Dependencies:**
-Create a `requirements.txt` in the build folder with **only** the libraries needed for that specific handler (to reduce cold starts and zip size):
-**Lambda A: Scraper & Publisher (`releases_scraper_and_publisher`)**
+Create a `requirements.txt` in the build folder with **only** the libraries needed for that specific handler:
+**Lambda A: `dbmReleasesScraperAndPublisher**`
 ```text
 bs4==0.0.2
 pdfplumber==0.11.9
@@ -256,7 +319,7 @@ tqdm==4.67.2
 ```
 
 
-**Lambda B: Page Publisher (`release_pages_publisher`)**
+**Lambda B: `dbmReleasePagesPublisher**`
 ```text
 pdfplumber==0.11.9
 pydantic-settings==2.12.0
@@ -267,7 +330,7 @@ tqdm==4.67.2
 ```
 
 
-**Lambda C: Page Processor (`release_page_processor_and_loader`)**
+**Lambda C: `dbmReleasePageProcessorAndLoader**`
 ```text
 pandas==3.0.0
 pdfplumber==0.11.9
@@ -308,7 +371,7 @@ zip -r ../scraper_package.zip .
 Upload the generated `.zip` file to the corresponding AWS Lambda function via the AWS Console or CLI.
 ```bash
 aws lambda update-function-code \
-    --function-name <your_lambda_function_name> \
+    --function-name dbmReleasesScraperAndPublisher \
     --zip-file fileb://../scraper_package.zip
 
 ```
