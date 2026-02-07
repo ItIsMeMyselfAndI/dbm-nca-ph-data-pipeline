@@ -1,7 +1,3 @@
-Here is the final, polished `README.md`. I have updated the **Database Setup** section to include your specific SQL schema, making the data structure clear to anyone reading the documentation.
-
----
-
 # DBM NCA Data Pipeline
 
 A serverless ETL (Extract, Transform, Load) pipeline designed to automate the scraping, processing, and storage of Notice of Cash Allocation (NCA) documents from the Philippine Department of Budget and Management (DBM).
