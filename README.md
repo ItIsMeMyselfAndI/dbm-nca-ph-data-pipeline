@@ -4,40 +4,37 @@ A serverless ETL (Extract, Transform, Load) pipeline designed to automate the sc
 
 This project focuses exclusively on the **ingestion layer**: it autonomously monitors the DBM website and populates a **Supabase** database.
 
-
-Here is the **Table of Contents** to place at the top of your `README.md`, right after the project description.
-
 ## 📖 Table of Contents
 
-- [Key Features](#-key-features)
-- [Architecture](#-architecture)
+
+- [Key Features](#key-features)
+- [Architecture](#architecture)
   - [Data Flow Breakdown](#data-flow-breakdown)
-- [Tech Stack](#-tech-stack)
-- [Project Structure](#-project-structure)
-- [Installation](#-installation)
-- [Environment Variables](#-environment-variables)
-- [Database Setup](#-database-setup)
-- [How to Run](#-how-to-run)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Installation](#installation)
+- [Environment Variables](#environment-variables)
+- [Database Setup](#database-setup)
+- [How to Run](#how-to-run)
   - [A. Locally](#a-locally)
   - [B. AWS Deployment (Manual)](#b-aws-deployment-manual)
     - [1. Infrastructure Setup (One-Time)](#1-infrastructure-setup-one-time)
     - [2. Packaging & Updating Code](#2-packaging--updating-code)
+
+
 
 ---
 
 ## 🚀 Key Features
 
 * **Serverless Architecture:** Fully serverless execution using **AWS Lambda** to minimize idle costs and scale automatically.
-* **Clean Architecture:** Domain logic is isolated from external frameworks, making the core code testable and portable.
-* **Granular Parallelism (Fan-Out):** Implements a "Page-Level" processing strategy. Large PDFs are logically split into individual pages, allowing hundreds of pages to be processed in parallel rather than sequentially.
-* **Resilient Queuing:** Uses **two stages of AWS SQS** (Release Queue & Page Queue) to decouple scraping, orchestration, and extraction.
+* **Optimized Parallelism (Batching):** Implements a smart batching strategy. Instead of processing pages individually, the orchestrator groups pages into logical batches (e.g., Pages 1-10). This significantly reduces **S3 `GetObject` costs** and Lambda overhead while maintaining high throughput.
+* **Resilient Queuing:** Uses **two stages of AWS SQS** (Release Queue & Batch Queue) to decouple scraping, orchestration, and extraction.
 * **Adaptive Table Parsing:** Dynamically handles **changing column layouts** within the PDF files using `pdfplumber` and `pandas`.
 
 ## 🏗️ Architecture
 
-The pipeline follows a **Fan-Out / Worker** pattern to handle high-volume document processing:
-
-![Pipeline Architecture Diagram](./dbm-nca-ph-pipeline.png)
+The pipeline follows a **Fan-Out / Worker** pattern with batched processing to optimize resource usage:
 
 ### Data Flow Breakdown
 
@@ -45,24 +42,162 @@ The pipeline follows a **Fan-Out / Worker** pattern to handle high-volume docume
 * Triggered by a scheduled event (Cron) or *manually*.
 * Scrapes the DBM website for new NCA releases.
 * Uploads the raw PDF to **S3**.
-* Pushes a message containing the `release details` and metadata to **SQS A**.
+* Pushes a message containing the `release` and metadata to **SQS A**.
+
+
+```python
+class Release(BaseModel):
+    id: str
+    title: str
+    url: str
+    filename: str
+    year: int
+    page_count: int = 0
+    file_meta_created_at: Optional[str] = None
+    file_meta_modified_at: Optional[str] = None
+
+```
 
 
 2. **Orchestration (Lambda B):**
 * Triggered by **SQS A**.
 * Downloads the PDF from S3 to determine the total page count.
-* **Fan-Out:** Loops through the page count and pushes a unique message for *every single page* to **SQS B**.
+* Groups pages into batches (e.g., 1-10, 11-20, etc.) based on a configurable batch size.
+* **Fan-Out:** Pushes a message for each *batch*.
+
+
+```python
+class ReleaseBatch(BaseModel):
+    batch_num: int
+    release: Release
+    start_page_num: int
+    end_page_num: int
+
+```
 
 
 3. **Extraction (Lambda C):**
-* Triggered by **SQS B**.
-* Downloads the PDF but processes *only* the specific page assigned to it.
-* Extracts the table data, handles column mapping, and cleans the data using `pandas`.
-* Inserts the structured rows directly into **Supabase**.
+* Triggered by **SQS B** (Queue Batch Size: 1 message per invocation).
+* Downloads the PDF **once** per batch.
+* Iterates through the specific range of pages (e.g., 1-10) defined in the message.
+* Extracts, cleans, and consolidates data using `pandas`.
+* Inserts the structured rows into **Supabase**.
 
 
 
 ## 🛠️ Tech Stack
+
+### Core Logic
+
+ # DBM NCA Data Pipeline
+
+
+A serverless ETL (Extract, Transform, Load) pipeline designed to automate the scraping, processing, and storage of Notice of Cash Allocation (NCA) documents from the Philippine Department of Budget and Management (DBM).
+
+
+This project focuses exclusively on the **ingestion layer**: it autonomously monitors the DBM website and populates a **Supabase** database.
+
+
+
+Here is the **Table of Contents** to place at the top of your `README.md`, right after the project description.
+
+
+## 📖 Table of Contents
+
+
+- [Key Features](#-key-features)
+
+- [Architecture](#-architecture)
+
+  - [Data Flow Breakdown](#data-flow-breakdown)
+
+- [Tech Stack](#-tech-stack)
+
+- [Project Structure](#-project-structure)
+
+- [Installation](#-installation)
+
+- [Environment Variables](#-environment-variables)
+
+- [Database Setup](#-database-setup)
+
+- [How to Run](#-how-to-run)
+
+  - [A. Locally](#a-locally)
+
+  - [B. AWS Deployment (Manual)](#b-aws-deployment-manual)
+
+    - [1. Infrastructure Setup (One-Time)](#1-infrastructure-setup-one-time)
+
+    - [2. Packaging & Updating Code](#2-packaging--updating-code)
+
+
+---
+
+
+## 🚀 Key Features
+
+
+* **Serverless Architecture:** Fully serverless execution using **AWS Lambda** to minimize idle costs and scale automatically.
+
+* **Clean Architecture:** Domain logic is isolated from external frameworks, making the core code testable and portable.
+
+* **Granular Parallelism (Fan-Out):** Implements a "Page-Level" processing strategy. Large PDFs are logically split into individual pages, allowing hundreds of pages to be processed in parallel rather than sequentially.
+
+* **Resilient Queuing:** Uses **two stages of AWS SQS** (Release Queue & Page Queue) to decouple scraping, orchestration, and extraction.
+
+* **Adaptive Table Parsing:** Dynamically handles **changing column layouts** within the PDF files using `pdfplumber` and `pandas`.
+
+
+## 🏗️ Architecture
+
+
+The pipeline follows a **Fan-Out / Worker** pattern to handle high-volume document processing:
+
+
+![Pipeline Architecture Diagram](./dbm-nca-ph-pipeline.png)
+
+
+### Data Flow Breakdown
+
+
+1. **Ingestion (Lambda A):**
+
+* Triggered by a scheduled event (Cron) or *manually*.
+
+* Scrapes the DBM website for new NCA releases.
+
+* Uploads the raw PDF to **S3**.
+
+* Pushes a message containing the `release details` and metadata to **SQS A**.
+
+
+
+2. **Orchestration (Lambda B):**
+
+* Triggered by **SQS A**.
+
+* Downloads the PDF from S3 to determine the total page count.
+
+* **Fan-Out:** Loops through the page count and pushes a unique message for *every single page* to **SQS B**.
+
+
+
+3. **Extraction (Lambda C):**
+
+* Triggered by **SQS B**.
+
+* Downloads the PDF but processes *only* the specific page assigned to it.
+
+* Extracts the table data, handles column mapping, and cleans the data using `pandas`.
+
+* Inserts the structured rows directly into **Supabase**.
+
+
+
+
+## 🛠️ Tech Stack
+
 
 ### Core Logic
 
@@ -73,7 +208,6 @@ The pipeline follows a **Fan-Out / Worker** pattern to handle high-volume docume
 
 * **Language:** Python 3.14+
 * **Data Processing:** Pandas, NumPy, pdfplumber
-* **Architecture:** Clean Architecture (Domain-Driven Design)
 
 ### Infrastructure (AWS)
 
@@ -81,14 +215,16 @@ The pipeline follows a **Fan-Out / Worker** pattern to handle high-volume docume
 ![AWS Lambda](https://img.shields.io/badge/Lambda-FF9900?style=for-the-badge&logo=aws-lambda&logoColor=white)
 ![AWS S3](https://img.shields.io/badge/S3-569A31?style=for-the-badge&logo=amazons3&logoColor=white)
 ![AWS SQS](https://img.shields.io/badge/SQS-FF4F8B?style=for-the-badge&logo=amazonsqs&logoColor=white)
+![AWS CloudWatch](https://img.shields.io/badge/CloudWatch-%23FF4F8B.svg?style=for-the-badge&logo=amazon-cloudwatch&logoColor=white)
 
-* **Compute:** AWS Lambda (3 Functions: Scraper, Splitter, Worker)
+* **Compute:** AWS Lambda (3 Functions: Scraper, Orchestrator, Worker)
 * **Storage:** AWS S3 (Raw Data Lake)
 * **Messaging:** AWS SQS (Standard Queues)
+* **Monitoring:** AWS CloudWatch (Logs & Metrics)
 
 ### Database
 
-![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
+ ![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
 
 * **Primary DB:** Supabase (PostgreSQL)
@@ -98,9 +234,9 @@ The pipeline follows a **Fan-Out / Worker** pattern to handle high-volume docume
 ```bash
 .
 ├── handlers/                               # AWS Lambda Entry Points (Interface Layer)
-│   ├── releases_scraper_and_publisher.py   # Lambda A: Scrapes DBM, saves to S3, pushes to SQS A
-│   ├── release_pages_publisher.py          # Lambda B: Downloads PDF, counts pages, Fan-Out to SQS B
-│   └── release_page_processor_and_loader.py # Lambda C: Extracts table from single page, loads to Supabase
+│   ├── scraper.py                          # Lambda A: Scrapes DBM, saves to S3, pushes to SQS A
+│   ├── orchestrator.py                     # Lambda B: Downloads PDF, batches pages, Fan-Out to SQS B
+│   └── worker.py                           # Lambda C: Processes a batch of pages, loads to Supabase
 │
 ├── src/                                    # Application Core (Framework Agnostic)
 │   ├── core/                               # Inner Layer (Business Rules)
@@ -127,7 +263,6 @@ Follow these steps to set up the project locally.
 ```bash
 git clone https://github.com/ItIsMeMyselfAndI/dbm-nca-ph-etl.git
 cd dbm-nca-ph-etl
-
 ```
 
 
@@ -135,14 +270,12 @@ cd dbm-nca-ph-etl
 ```bash
 python -m venv venv
 source venv/bin/activate  # On Windows use: venv\Scripts\activate
-
 ```
 
 
 3. **Install dependencies:**
 ```bash
 pip install -r requirements.txt
-
 ```
 
 
@@ -151,7 +284,7 @@ pip install -r requirements.txt
 
 Create a `.env` file in the root directory:
 
-```text
+```bash
 # Supabase Configuration
 SUPABASE_URL=your_supabase_project_url
 SUPABASE_ANON_KEY=your_supabase_anon_key
@@ -163,7 +296,7 @@ AWS_REGION=ap-southeast-1
 # AWS Resources
 AWS_S3_BUCKET_NAME=your_s3_bucket_name
 AWS_SQS_RELEASE_QUEUE_URL=https://sqs.region.amazonaws.com/account-id/release-queue
-AWS_SQS_RELEASE_PAGE_QUEUE_URL=https://sqs.region.amazonaws.com/account-id/page-queue
+AWS_SQS_RELEASE_BATCH_QUEUE_URL=https://sqs.region.amazonaws.com/account-id/batch-queue
 
 ```
 
@@ -260,29 +393,30 @@ To deploy or update the Lambda functions, you must first create the infrastructu
 Before deploying code, create the following resources in your AWS Console:
 
 1. **S3 Bucket:** Create a bucket for storing PDFs.
-* *Note the name for `AWS_S3_BUCKET_NAME` environment variable.*
+* *Note the name for `AWS_S3_BUCKET_NAME`.*
 
 
 2. **SQS Queue A:** Create a standard queue for release metadata.
-* *Note the URL for `AWS_SQS_RELEASE_QUEUE_URL` environment variable.*
+* *Note the URL for `AWS_SQS_RELEASE_QUEUE_URL`.*
 
 
-3. **SQS Queue B:** Create a standard queue for page metadata.
-* *Note the URL for `AWS_SQS_RELEASE_PAGE_QUEUE_URL` environment variable.*
+3. **SQS Queue B:** Create a standard queue for **page batches**.
+* *Note the URL for `AWS_SQS_RELEASE_BATCH_QUEUE_URL`.*
 
 
-4. **Lambda A (Scraper):** Create a function named **`dbmReleasesScraperAndPublisher`**.
+4. **Lambda A (Scraper):** Create a function named **`dbmScraper`**.
 * *Runtime:* Python 3.14
 
 
-5. **Lambda B (Orchestrator):** Create a function named **`dbmReleasePagesPublisher`**.
+5. **Lambda B (Orchestrator):** Create a function named **`dbmOrchestrator`**.
 * *Runtime:* Python 3.14
 * *Trigger:* Add **SQS Queue A** as the trigger.
 
 
-6. **Lambda C (Worker):** Create a function named **`dbmReleasePageProcessorAndLoader`**.
+6. **Lambda C (Worker):** Create a function named **`dbmWorker`**.
 * *Runtime:* Python 3.14
 * *Trigger:* Add **SQS Queue B** as the trigger.
+* **Crucial:** Set the **Batch size** to `1`. This ensures each Lambda invocation handles exactly one "work unit" (which internally contains a batch of pages).
 
 
 
@@ -298,42 +432,39 @@ Copy the entire `src/` directory into your build folder.
 Copy the specific handler file from `handlers/` to the build folder and **rename it** to `lambda_function.py`.
 ```bash
 # Example: Renaming the Scraper Handler
-cp handlers/releases_scraper_and_publisher.py dist/build_scraper/lambda_function.py
+cp handlers/scraper.py dist/build_scraper/lambda_function.py
 
 ```
 
 
 4. **Define Dependencies:**
-Create a `requirements.txt` in the build folder with **only** the libraries needed for that specific handler:
-**Lambda A: `dbmReleasesScraperAndPublisher`**
+Create a `requirements.txt` in the build folder with **only** the libraries needed for that specific handler. This ensures each function remains lightweight.
+**Lambda A: `dbmScraper**`
 ```text
 bs4==0.0.2
 pdfplumber==0.11.9
 pydantic-settings==2.12.0
 PyPDF2==3.0.1
 supabase==2.27.2
-tqdm==4.67.2
+
 ```
 
 
-**Lambda B: `dbmReleasePagesPublisher`
+**Lambda B: `dbmOrchestrator**`
 ```text
-pdfplumber==0.11.9
 pydantic-settings==2.12.0
-PyPDF2==3.0.1
-supabase==2.27.2
-tqdm==4.67.2
+
 ```
 
 
-**Lambda C: `dbmReleasePageProcessorAndLoader`**
+**Lambda C: `dbmWorker**`
 ```text
 pandas==3.0.0
 pdfplumber==0.11.9
 pydantic-settings==2.12.0
 PyPDF2==3.0.1
 supabase==2.27.2
-tqdm==4.67.2
+
 ```
 
 
@@ -365,8 +496,13 @@ zip -r ../scraper_package.zip .
 8. **Update Lambda:**
 Upload the generated `.zip` file to the corresponding AWS Lambda function via the AWS Console or CLI.
 ```bash
-aws lambda update-function-code \
-    --function-name dbmReleasesScraperAndPublisher \
-    --zip-file fileb://../scraper_package.zip
+# Update dbmScraper
+aws lambda update-function-code --function-name dbmScraper --zip-file fileb://../scraper_package.zip
+
+# Update dbmOrchestrator
+aws lambda update-function-code --function-name dbmOrchestrator --zip-file fileb://../orchestrator_package.zip
+
+# Update dbmWorker
+aws lambda update-function-code --function-name dbmWorker --zip-file fileb://../worker_package.zip
 
 ```

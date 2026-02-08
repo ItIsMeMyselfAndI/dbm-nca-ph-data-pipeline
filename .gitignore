@@ -1,7 +1,7 @@
 venv/
 *pycache*
 .env
-*egg-info*
+*.egg-info/
 
 releases/
 data/
@@ -13,3 +13,5 @@ dist/
 
 *.pdf
 *.PDF
+
+*ver2
