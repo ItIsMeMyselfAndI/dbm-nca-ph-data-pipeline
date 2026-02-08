@@ -3,15 +3,15 @@ import logging
 import sys
 from tqdm import tqdm
 from datetime import timedelta
-from src.core.use_cases.load_allocations_and_records_to_db import (
-    LoadRecordsAndAllocationsToDB,
-)
-from src.core.use_cases.queue_release_page import QueueReleasePage
-from src.core.use_cases.scrape_and_queue_releases import ScrapeAndQueueReleases
+from src.core.use_cases.message_queuer import MessageQueuer
+from src.core.use_cases.nca_db_loader import NCADBLoader
+from src.core.use_cases.raw_table_cleaner import RawTableCleaner
+from src.core.use_cases.raw_table_extractor import RawTableExtractor
+from src.core.use_cases.release_batcher import ReleaseBatcher
+from src.core.use_cases.releases_scraper import ReleasesScraper
 from src.infrastructure.adapters.s3_storage import S3Storage
 from src.logging_config import setup_logging
 
-from src.core.use_cases.extract_page_table import ExtractPageTable
 from src.infrastructure.adapters.mock_queue import MockQueue
 from src.infrastructure.adapters.supabase_repository import SupabaseRepository
 from src.infrastructure.adapters.local_storage import LocalStorage
@@ -21,13 +21,14 @@ from src.infrastructure.adapters.pdf_parser import PDFParser
 from src.infrastructure.constants import (
     ALLOCATION_COLUMNS,
     BASE_STORAGE_PATH,
+    BATCH_SIZE,
     DB_BULK_SIZE,
     RECORD_COLUMNS,
     VALID_COLUMNS,
 )
 
 # <test>
-MAX_PAGE_COUNT_TO_PUBLISH = None
+BATCH_COUNT_TO_QUEUE = 1
 # </test>
 
 
@@ -48,21 +49,17 @@ data_cleaner = PdDataCleaner(
 repository = SupabaseRepository(db_bulk_size=DB_BULK_SIZE)
 
 # use cases
-scrape_and_queue_job = ScrapeAndQueueReleases(
+scraper_job = ReleasesScraper(
     scraper=scraper,
-    storage=storage,
     parser=parser,
-    queue=queue,
+    storage=storage,
     repository=repository,
 )
-queue_job = QueueReleasePage(queue=queue)
-extract_job = ExtractPageTable(storage=storage, parser=parser)
-clean_job = PdDataCleaner(
-    allocation_comumns=ALLOCATION_COLUMNS,
-    record_columns=RECORD_COLUMNS,
-    valid_columns=VALID_COLUMNS,
-)
-load_job = LoadRecordsAndAllocationsToDB(
+queuer_job = MessageQueuer(queue=queue)
+batcher_job = ReleaseBatcher(batch_size=BATCH_SIZE)
+extractor_job = RawTableExtractor(storage=storage, parser=parser)
+cleaner_job = RawTableCleaner(data_cleaner=data_cleaner)
+loader_job = NCADBLoader(
     data_cleaner=data_cleaner,
     repository=repository,
 )
@@ -72,59 +69,102 @@ def main():
     logger.info("Initializing NCA Pipeline...")
 
     try:
+        # scrape
         logger.info("Starting Scraping Job...")
-        releases = scrape_and_queue_job.run(oldest_release_year=2024)
+        releases = scraper_job.run(oldest_release_year=2024)
+        logger.info("Job completed successfully.")
+        # queue
+        logger.info("Starting Queueing Job...")
+        for release in releases:
+            logger.info(f"Queueing {release.filename} metadata...")
+            queuer_job.run(release)
+            logger.debug(f"Queued {release.filename} metadata: {release}")
         logger.info("Job completed successfully.")
 
-        logger.info("Starting Processing Job...")
         for release in releases:
+            prev_time = time.time()
+
+            # batcher
+            batches = batcher_job.run(release)
             logger.info(
-                f"Processing & Loading " f"{release.filename} raw data to db..."
+                f"Batched release: {release.filename} into {len(batches)} batches."
             )
 
+            logger.info("Starting queuer job...")
+
             # <test>
-            if MAX_PAGE_COUNT_TO_PUBLISH is not None:
-                page_count = min(release.page_count, MAX_PAGE_COUNT_TO_PUBLISH)
-            else:
-                page_count = release.page_count
+            if BATCH_COUNT_TO_QUEUE is not None:
+                batch_count = min(BATCH_COUNT_TO_QUEUE, len(batches))
+                batches = batches[:batch_count]
+                logger.info(f"Limiting to {batch_count} batches for testing purposes.")
             # </test>
 
-            prev_time = time.time()
-            for page_num in tqdm(
-                range(page_count), desc="Processing/Loading", unit="file"
+            # queuer
+            for batch in batches:
+                logger.debug(
+                    f"Queueing {release.id} batch-{batch.batch_num} metadata..."
+                )
+                queuer_job.run(batch)
+                logger.debug(
+                    f"Queued {release.filename} "
+                    f"batch-{batch.batch_num} metadata: {batch}"
+                )
+            logger.info(
+                f"Queued {len(batches)} batches for release: {release.filename}"
+            )
+            logger.info("Queuer job completed.")
+
+            logger.info("Starting Processing & Loading Job...")
+            for batch in tqdm(
+                batches, desc=f"Processing/Loading {release.filename}", unit="batch"
             ):
-                # queue
-                queue_job.run(release, page_num)
-
-                # extract
-                extracted_table = extract_job.run(release.filename, page_num)
-
+                # extractor
+                logger.debug(
+                    f"Extracting {batch.release.filename} "
+                    f"batch-{batch.batch_num} tables..."
+                )
+                extracted_table = extractor_job.run(batch)
                 if not extracted_table:
                     logger.warning(
-                        f"Skipped: No table extracted for release "
-                        f"{release.id} page-{page_num}"
+                        f"No tables extracted for {batch.release.filename} "
+                        f"batch-{batch.batch_num}"
                     )
                     continue
-
-                # clean
-                cleaned_table = clean_job.clean_raw_data(
-                    extracted_table.rows, release.id
+                logger.debug(
+                    f"Extracted {len(extracted_table)} rows for "
+                    f"{batch.release.filename} batch-{batch.batch_num}"
                 )
-                # load
-                load_job.run(release, cleaned_table, page_num)
+                # cleaner
+                logger.debug(
+                    f"Cleaning {batch.release.id} batch-{batch.batch_num} tables..."
+                )
+                nca_data = cleaner_job.run(extracted_table, batch.release.id)
+                logger.debug(
+                    f"Cleaned data for {batch.release.filename} batch-{batch.batch_num}: "
+                    f"{len(nca_data.allocations)} allocations, "
+                    f"{len(nca_data.records)} records"
+                )
+                # loader
+                logger.debug(
+                    f"Loading {batch.release.id} batch-{batch.batch_num} data to db..."
+                )
+                loader_job.run(batch.release, nca_data, batch.batch_num)
+                logger.debug(
+                    f"Loaded {batch.release.filename} batch-{batch.batch_num} data to db"
+                )
 
             elapsed = str(timedelta(seconds=time.time() - prev_time)).split(":")
             logger.info(
-                f"Processing & Loading complete in "
+                f"Finished processing/loading {release.filename}: "
                 f"{elapsed[0]}h "
                 f"{elapsed[1]}m "
                 f"{elapsed[2]}s: "
                 f"{release.filename}"
             )
-        logger.info("Job completed successfully.")
+        logger.info("Jobs completed successfully.")
 
     except Exception as e:
-        logger.critical(f"Job crashed: {e}", exc_info=True)
+        logger.critical(f"NCA Pipline crashed: {e}", exc_info=True)
         sys.exit(1)
 
 

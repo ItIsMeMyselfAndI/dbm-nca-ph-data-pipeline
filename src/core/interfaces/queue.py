@@ -1,10 +1,9 @@
 from typing import Protocol
 
-from src.core.entities.release import Release
-from src.core.entities.release_page_queue_body import ReleasePageQueueBody
+from pydantic import BaseModel
 
 
 class QueueProvider(Protocol):
-    def send_data(self, data: Release | ReleasePageQueueBody) -> None:
+    def send(self, data: BaseModel) -> None:
         """sends a batch of extracted rows to the queue"""
         ...

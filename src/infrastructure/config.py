@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     AWS_S3_BUCKET_NAME: str
 
     AWS_SQS_RELEASE_QUEUE_URL: str
-    AWS_SQS_RELEASE_PAGE_QUEUE_URL: str
+    AWS_SQS_RELEASE_BATCH_QUEUE_URL: str
 
     AWS_LAMBDA_FUNCTION_NAME: Optional[str] = None
 

@@ -3,6 +3,8 @@ from pydantic import BaseModel
 from src.core.entities.release import Release
 
 
-class ReleasePageQueueBody(BaseModel):
+class ReleaseBatch(BaseModel):
+    batch_num: int
     release: Release
-    page_num: int
+    start_page_num: int
+    end_page_num: int

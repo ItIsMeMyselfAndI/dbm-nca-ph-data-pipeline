@@ -3,7 +3,6 @@ from io import BytesIO
 import logging
 from typing import List, Tuple
 
-from src.core.interfaces.queue import QueueProvider
 from src.core.interfaces.scraper import ScraperProvider
 from src.core.interfaces.storage import StorageProvider
 from src.core.entities.release import Release
@@ -13,17 +12,17 @@ from src.core.interfaces.repository import RepositoryProvider
 logger = logging.getLogger(__name__)
 
 
-class ScrapeAndQueueReleases:
-    def __init__(self,
-                 scraper: ScraperProvider,
-                 storage: StorageProvider,
-                 parser: ParserProvider,
-                 queue: QueueProvider,
-                 repository: RepositoryProvider):
+class ReleasesScraper:
+    def __init__(
+        self,
+        scraper: ScraperProvider,
+        storage: StorageProvider,
+        parser: ParserProvider,
+        repository: RepositoryProvider,
+    ):
         self.scraper = scraper
         self.storage = storage
         self.parser = parser
-        self.queue = queue
         self.repository = repository
 
     def run(self, oldest_release_year: int = 2024) -> List[Release]:
@@ -38,49 +37,45 @@ class ScrapeAndQueueReleases:
             raise e
 
         # filter
-        logger.info("Filtering only new/modified releases...")
-        filtered_releases, filtered_data = \
-            self._filter_new_or_updated_releases(releases)
-        logger.info(f"Filtered new/updated releases: "
-                    f"{len(filtered_releases)}/{len(releases)} remained")
+        logger.info("Filtering new or updated releases...")
+        filtered_releases, filtered_data = self._filter_new_or_updated_releases(
+            releases
+        )
+        logger.info(
+            f"{len(filtered_releases)}/{len(releases)} releases to be added or updated."
+        )
 
         # save
         success_count = 0
         for i in range(len(filtered_releases)):
             try:
-                page_count = self._save_release(filtered_releases[i],
-                                                filtered_data[i])
+                page_count = self._save_release(filtered_releases[i], filtered_data[i])
                 filtered_releases[i].page_count = page_count
-
-                self.queue.send_data(filtered_releases[i])
-                logger.info(f"Queued release file for processing: "
-                            f"{filtered_releases[i].filename}")
-
                 success_count += 1
 
             except Exception as e:
-                logger.error(f"Failed to sync "
-                             f"{filtered_releases[i].filename}: {e}")
+                logger.error(f"Failed to sync " f"{filtered_releases[i].filename}: {e}")
 
-        logger.info(f"Successfully synced {success_count}/"
-                    f"{len(filtered_releases)} filtered releases.")
+        logger.info(
+            f"Successfully synced {success_count}/"
+            f"{len(filtered_releases)} filtered releases."
+        )
 
         # <test ----------->
         # return releases
         # </test ----------->
         return filtered_releases
 
-    def _filter_new_or_updated_releases(self,
-                                        releases: List[Release]
-                                        ) -> Tuple[List[Release],
-                                                   List[BytesIO]]:
+    def _filter_new_or_updated_releases(
+        self, releases: List[Release]
+    ) -> Tuple[List[Release], List[BytesIO]]:
         """
-            if db release or storage release is empty
-                include all releases
-            else
-                for each release
-                    if modified:
-                        include release
+        if db release or storage release is empty
+            include all releases
+        else
+            for each release
+                if modified:
+                    include release
         """
         filtered_releases = []
         filtered_data = []
@@ -95,8 +90,9 @@ class ScrapeAndQueueReleases:
             data.seek(0)
 
             if not file_release_metadata:
-                logger.info(f"Skipped - Scraped release has no "
-                            f"metadata: {release.filename}")
+                logger.info(
+                    f"Skipped. Could not extract metadata for {release.filename}."
+                )
                 continue
 
             release.file_meta_created_at = file_release_metadata.created_at
@@ -105,33 +101,27 @@ class ScrapeAndQueueReleases:
             if not db_release:
                 filtered_releases.append(release)
                 filtered_data.append(data)
-                logger.info(f"Release not found in DB. "
-                            f"To be a added: {release.filename}")
+                logger.info(f"Database missing release detected: {release.filename}")
                 continue
 
             if not storage_release:
                 filtered_releases.append(release)
                 filtered_data.append(data)
-                logger.info(f"Release not found in Storage. "
-                            f"To be a added: {release.filename}")
+                logger.info(f"Storage missing release detected: {release.filename}")
                 continue
 
             has_changed = (
-                db_release.file_meta_created_at !=
-                file_release_metadata.created_at
-                or
-                db_release.file_meta_modified_at !=
-                file_release_metadata.modified_at
+                db_release.file_meta_created_at != file_release_metadata.created_at
+                or db_release.file_meta_modified_at != file_release_metadata.modified_at
             )
 
             if has_changed:
                 self.repository.delete_release(release.id)
-                logger.info(f"Update detected for {
-                            release.filename}. Re-processing...")
+                logger.info(f"Change detected for {release.filename}. Updating...")
                 filtered_releases.append(release)
                 filtered_data.append(data)
             else:
-                logger.debug(f"No changes for {release.filename}. Skipping.")
+                logger.info(f"Skipped. No change detected for {release.filename}.")
 
         return filtered_releases, filtered_data
 
