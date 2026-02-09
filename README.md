@@ -36,12 +36,14 @@ This project focuses exclusively on the **ingestion layer**: it autonomously mon
 
 The pipeline follows a **Fan-Out / Worker** pattern with batched processing to optimize resource usage:
 
+![Pipeline Architecture Diagram](./dbm-nca-ph-pipeline.png)
+
 ### Data Flow Breakdown
 
 1. **Ingestion (Lambda A):**
 * Triggered by a scheduled event (Cron) or *manually*.
 * Scrapes the DBM website for new NCA releases.
-* Uploads the raw PDF to **S3**.
+* Uploads the raw PDF to **S3** and **Database**.
 * Pushes a message containing the `release` and metadata to **SQS A**.
 
 
@@ -87,117 +89,6 @@ class ReleaseBatch(BaseModel):
 
 ## 🛠️ Tech Stack
 
-### Core Logic
-
- # DBM NCA Data Pipeline
-
-
-A serverless ETL (Extract, Transform, Load) pipeline designed to automate the scraping, processing, and storage of Notice of Cash Allocation (NCA) documents from the Philippine Department of Budget and Management (DBM).
-
-
-This project focuses exclusively on the **ingestion layer**: it autonomously monitors the DBM website and populates a **Supabase** database.
-
-
-
-Here is the **Table of Contents** to place at the top of your `README.md`, right after the project description.
-
-
-## 📖 Table of Contents
-
-
-- [Key Features](#-key-features)
-
-- [Architecture](#-architecture)
-
-  - [Data Flow Breakdown](#data-flow-breakdown)
-
-- [Tech Stack](#-tech-stack)
-
-- [Project Structure](#-project-structure)
-
-- [Installation](#-installation)
-
-- [Environment Variables](#-environment-variables)
-
-- [Database Setup](#-database-setup)
-
-- [How to Run](#-how-to-run)
-
-  - [A. Locally](#a-locally)
-
-  - [B. AWS Deployment (Manual)](#b-aws-deployment-manual)
-
-    - [1. Infrastructure Setup (One-Time)](#1-infrastructure-setup-one-time)
-
-    - [2. Packaging & Updating Code](#2-packaging--updating-code)
-
-
----
-
-
-## 🚀 Key Features
-
-
-* **Serverless Architecture:** Fully serverless execution using **AWS Lambda** to minimize idle costs and scale automatically.
-
-* **Clean Architecture:** Domain logic is isolated from external frameworks, making the core code testable and portable.
-
-* **Granular Parallelism (Fan-Out):** Implements a "Page-Level" processing strategy. Large PDFs are logically split into individual pages, allowing hundreds of pages to be processed in parallel rather than sequentially.
-
-* **Resilient Queuing:** Uses **two stages of AWS SQS** (Release Queue & Page Queue) to decouple scraping, orchestration, and extraction.
-
-* **Adaptive Table Parsing:** Dynamically handles **changing column layouts** within the PDF files using `pdfplumber` and `pandas`.
-
-
-## 🏗️ Architecture
-
-
-The pipeline follows a **Fan-Out / Worker** pattern to handle high-volume document processing:
-
-
-![Pipeline Architecture Diagram](./dbm-nca-ph-pipeline.png)
-
-
-### Data Flow Breakdown
-
-
-1. **Ingestion (Lambda A):**
-
-* Triggered by a scheduled event (Cron) or *manually*.
-
-* Scrapes the DBM website for new NCA releases.
-
-* Uploads the raw PDF to **S3**.
-
-* Pushes a message containing the `release details` and metadata to **SQS A**.
-
-
-
-2. **Orchestration (Lambda B):**
-
-* Triggered by **SQS A**.
-
-* Downloads the PDF from S3 to determine the total page count.
-
-* **Fan-Out:** Loops through the page count and pushes a unique message for *every single page* to **SQS B**.
-
-
-
-3. **Extraction (Lambda C):**
-
-* Triggered by **SQS B**.
-
-* Downloads the PDF but processes *only* the specific page assigned to it.
-
-* Extracts the table data, handles column mapping, and cleans the data using `pandas`.
-
-* Inserts the structured rows directly into **Supabase**.
-
-
-
-
-## 🛠️ Tech Stack
-
 
 ### Core Logic
 
@@ -224,7 +115,7 @@ The pipeline follows a **Fan-Out / Worker** pattern to handle high-volume docume
 
 ### Database
 
- ![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
 
 * **Primary DB:** Supabase (PostgreSQL)
@@ -234,7 +125,7 @@ The pipeline follows a **Fan-Out / Worker** pattern to handle high-volume docume
 ```bash
 .
 ├── handlers/                               # AWS Lambda Entry Points (Interface Layer)
-│   ├── scraper.py                          # Lambda A: Scrapes DBM, saves to S3, pushes to SQS A
+│   ├── scraper.py                          # Lambda A: Scrapes DBM, saves to S3 and Database, pushes to SQS A
 │   ├── orchestrator.py                     # Lambda B: Downloads PDF, batches pages, Fan-Out to SQS B
 │   └── worker.py                           # Lambda C: Processes a batch of pages, loads to Supabase
 │
