@@ -42,7 +42,7 @@ class ReleasesScraper:
             releases
         )
         logger.info(
-            f"{len(filtered_releases)}/{len(releases)} releases to be added or updated."
+            f"Remaining filtered releases: {len(filtered_releases)}/{len(releases)}"
         )
 
         # save

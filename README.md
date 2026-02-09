@@ -32,6 +32,43 @@ This project focuses exclusively on the **ingestion layer**: it autonomously mon
 * **Resilient Queuing:** Uses **two stages of AWS SQS** (Release Queue & Batch Queue) to decouple scraping, orchestration, and extraction.
 * **Adaptive Table Parsing:** Dynamically handles **changing column layouts** within the PDF files using `pdfplumber` and `pandas`.
 
+
+## 🛠️ Tech Stack
+
+
+### Core Logic
+
+![Python](https://img.shields.io/badge/python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Pandas](https://img.shields.io/badge/pandas-%23150458.svg?style=for-the-badge&logo=pandas&logoColor=white)
+![NumPy](https://img.shields.io/badge/numpy-%23013243.svg?style=for-the-badge&logo=numpy&logoColor=white)
+![Pydantic](https://img.shields.io/badge/Pydantic-E92063?style=for-the-badge&logo=pydantic&logoColor=white)
+
+* **Language:** Python 3.14+
+* **Data Processing:** Pandas, NumPy, pdfplumber
+
+### Infrastructure (AWS)
+
+![AWS](https://img.shields.io/badge/AWS-%23FF9900.svg?style=for-the-badge&logo=amazon-aws&logoColor=white)
+![AWS Lambda](https://img.shields.io/badge/Lambda-FF9900?style=for-the-badge&logo=aws-lambda&logoColor=white)
+![AWS S3](https://img.shields.io/badge/S3-569A31?style=for-the-badge&logo=amazons3&logoColor=white)
+![AWS SQS](https://img.shields.io/badge/SQS-FF4F8B?style=for-the-badge&logo=amazonsqs&logoColor=white)
+![AWS CloudWatch](https://img.shields.io/badge/CloudWatch-%23FF4F8B.svg?style=for-the-badge&logo=amazon-cloudwatch&logoColor=white)
+
+* **Compute:** AWS Lambda (3 Functions: Scraper, Orchestrator, Worker)
+* **Storage:** AWS S3 (Raw Data Lake)
+* **Messaging:** AWS SQS (Standard Queues)
+* **Monitoring:** AWS CloudWatch (Logs & Metrics)
+
+### Database
+
+![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
+
+* **Primary DB:** Supabase (PostgreSQL)
+
+
+
+
 ## 🏗️ Architecture
 
 The pipeline follows a **Fan-Out / Worker** pattern with batched processing to optimize resource usage:
@@ -87,47 +124,19 @@ class ReleaseBatch(BaseModel):
 
 
 
-## 🛠️ Tech Stack
-
-
-### Core Logic
-
-![Python](https://img.shields.io/badge/python-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![Pandas](https://img.shields.io/badge/pandas-%23150458.svg?style=for-the-badge&logo=pandas&logoColor=white)
-![NumPy](https://img.shields.io/badge/numpy-%23013243.svg?style=for-the-badge&logo=numpy&logoColor=white)
-![Pydantic](https://img.shields.io/badge/Pydantic-E92063?style=for-the-badge&logo=pydantic&logoColor=white)
-
-* **Language:** Python 3.14+
-* **Data Processing:** Pandas, NumPy, pdfplumber
-
-### Infrastructure (AWS)
-
-![AWS](https://img.shields.io/badge/AWS-%23FF9900.svg?style=for-the-badge&logo=amazon-aws&logoColor=white)
-![AWS Lambda](https://img.shields.io/badge/Lambda-FF9900?style=for-the-badge&logo=aws-lambda&logoColor=white)
-![AWS S3](https://img.shields.io/badge/S3-569A31?style=for-the-badge&logo=amazons3&logoColor=white)
-![AWS SQS](https://img.shields.io/badge/SQS-FF4F8B?style=for-the-badge&logo=amazonsqs&logoColor=white)
-![AWS CloudWatch](https://img.shields.io/badge/CloudWatch-%23FF4F8B.svg?style=for-the-badge&logo=amazon-cloudwatch&logoColor=white)
-
-* **Compute:** AWS Lambda (3 Functions: Scraper, Orchestrator, Worker)
-* **Storage:** AWS S3 (Raw Data Lake)
-* **Messaging:** AWS SQS (Standard Queues)
-* **Monitoring:** AWS CloudWatch (Logs & Metrics)
-
-### Database
-
-![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
-
-* **Primary DB:** Supabase (PostgreSQL)
 
 ## 📂 Project Structure
 
 ```bash
 .
-├── handlers/                               # AWS Lambda Entry Points (Interface Layer)
-│   ├── scraper.py                          # Lambda A: Scrapes DBM, saves to S3 and Database, pushes to SQS A
-│   ├── orchestrator.py                     # Lambda B: Downloads PDF, batches pages, Fan-Out to SQS B
-│   └── worker.py                           # Lambda C: Processes a batch of pages, loads to Supabase
+├── handlers/                               # AWS Lambda Entry Points & Deployment
+│   ├── deploy.sh                           # Automated deployment script
+│   ├── scraper.py                          # Handler for Lambda A
+│   ├── orchestrator.py                     # Handler for Lambda B
+│   ├── worker.py                           # Handler for Lambda C
+│   ├── dbmScraper_requirements.txt
+│   ├── dbmOrchestrator_requirements.txt
+│   └── dbmWorker_requirements.txt
 │
 ├── src/                                    # Application Core (Framework Agnostic)
 │   ├── core/                               # Inner Layer (Business Rules)
@@ -152,8 +161,8 @@ Follow these steps to set up the project locally.
 
 1. **Clone the repository:**
 ```bash
-git clone https://github.com/ItIsMeMyselfAndI/dbm-nca-ph-etl.git
-cd dbm-nca-ph-etl
+git clone https://github.com/ItIsMeMyselfAndI/dbm-nca-ph-data-pipeline.git
+cd dbm-nca-ph-data-pipeline
 ```
 
 
@@ -242,7 +251,12 @@ CREATE TABLE public.allocation (
 
 4. Click **Run** to initialize the tables and indices.
 
+
+
+
 ## 🏃 How to Run
+
+
 
 ### A. Locally
 
@@ -275,7 +289,7 @@ python main.py
 
 
 
-### B. AWS Deployment (Manual)
+### B. AWS Deployment
 
 To deploy or update the Lambda functions, you must first create the infrastructure and then package the code manually.
 
@@ -311,89 +325,20 @@ Before deploying code, create the following resources in your AWS Console:
 
 
 
-#### 2. Packaging & Updating Code
+#### 2. Deploying Updates (Automated)
 
-Repeat this process for **each of the 3 handlers**:
+Navigate to the `handlers/` directory and use the deployment script:
 
-1. **Prepare a Build Folder:**
-Create a clean, temporary folder for the specific function you are deploying (e.g., `dist/build_scraper`).
-2. **Copy Source Code:**
-Copy the entire `src/` directory into your build folder.
-3. **Copy & Rename Handler:**
-Copy the specific handler file from `handlers/` to the build folder and **rename it** to `lambda_function.py`.
 ```bash
-# Example: Renaming the Scraper Handler
-cp handlers/scraper.py dist/build_scraper/lambda_function.py
+# Usage: ./deploy.sh <SOURCE_FILE> <FUNCTION_NAME>
+
+./deploy.sh scraper.py dbmScraper
+./deploy.sh orchestrator.py dbmOrchestrator
+./deploy.sh worker.py dbmWorker
 
 ```
 
+> [!IMPORTANT]
+> **Naming Convention:** The script strictly requires requirements files to be named `<FUNCTION_NAME>_requirements.txt`. Ensure your handler names match your AWS Lambda function names to avoid deployment conflicts.
 
-4. **Define Dependencies:**
-Create a `requirements.txt` in the build folder with **only** the libraries needed for that specific handler. This ensures each function remains lightweight.
-**Lambda A: `dbmScraper**`
-```text
-bs4==0.0.2
-pdfplumber==0.11.9
-pydantic-settings==2.12.0
-PyPDF2==3.0.1
-supabase==2.27.2
-
-```
-
-
-**Lambda B: `dbmOrchestrator**`
-```text
-pydantic-settings==2.12.0
-
-```
-
-
-**Lambda C: `dbmWorker**`
-```text
-pandas==3.0.0
-pdfplumber==0.11.9
-pydantic-settings==2.12.0
-PyPDF2==3.0.1
-supabase==2.27.2
-
-```
-
-
-5. **Install Dependencies:**
-Install the specific libraries directly into the build folder.
-```bash
-pip install -r requirements.txt --target .
-
-```
-
-
-6. **Cleanup (Crucial):**
-Remove compiled Python files to avoid bloating the deployment package.
-```bash
-find . -type d -name "__pycache__" -exec rm -rf {} +
-find . -type f -name "*.pyc" -delete
-
-```
-
-
-7. **Zip the Package:**
-Zip **all contents** of the build folder (not the folder itself).
-```bash
-zip -r ../scraper_package.zip .
-
-```
-
-
-8. **Update Lambda:**
-Upload the generated `.zip` file to the corresponding AWS Lambda function via the AWS Console or CLI.
-```bash
-# Update dbmScraper
-aws lambda update-function-code --function-name dbmScraper --zip-file fileb://../scraper_package.zip
-
-# Update dbmOrchestrator
-aws lambda update-function-code --function-name dbmOrchestrator --zip-file fileb://../orchestrator_package.zip
-
-# Update dbmWorker
-aws lambda update-function-code --function-name dbmWorker --zip-file fileb://../worker_package.zip
-
-```
+---
