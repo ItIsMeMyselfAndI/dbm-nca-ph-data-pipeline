@@ -11,7 +11,7 @@ from src.infrastructure.constants import BASE_URL, NCA_PAGE
 from src.core.interfaces.scraper import ScraperProvider
 
 
-class NCAScraper(ScraperProvider):
+class Bs4Scraper(ScraperProvider):
     def __init__(self):
         pass
 
@@ -22,8 +22,7 @@ class NCAScraper(ScraperProvider):
         res.raise_for_status()
         soup = BeautifulSoup(res.content, "html.parser")
 
-        for elem in soup.find_all("a",
-                                  href=re.compile(r".*NCA.*\.pdf$", re.I)):
+        for elem in soup.find_all("a", href=re.compile(r".*NCA.*\.pdf$", re.I)):
             url = str(elem.get("href", ""))
             title = elem.get_text(strip=True)
             release = self._create_release(url, title)
@@ -51,7 +50,7 @@ class NCAScraper(ScraperProvider):
             year = datetime.now().year
         else:
             year = None
-            match = re.search(r'(\d{4})', filename)
+            match = re.search(r"(\d{4})", filename)
             if match:
                 year = int(match.group(1))
 
@@ -59,10 +58,6 @@ class NCAScraper(ScraperProvider):
             return None
 
         release = Release(
-            id=f"id_{year}",
-            title=title,
-            url=url,
-            filename=filename,
-            year=year
+            id=f"id_{year}", title=title, url=url, filename=filename, year=year
         )
         return release

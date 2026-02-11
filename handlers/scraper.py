@@ -2,6 +2,7 @@ import time
 import logging
 from datetime import timedelta
 
+from src.infrastructure.adapters.bs4_scraper import Bs4Scraper
 from src.logging_config import setup_logging
 from src.core.use_cases.message_queuer import MessageQueuer
 from src.core.use_cases.releases_scraper import ReleasesScraper
@@ -10,7 +11,6 @@ from src.infrastructure.adapters.sqs_queue import SQSQueue
 from src.infrastructure.config import settings
 
 from src.infrastructure.adapters.supabase_repository import SupabaseRepository
-from src.infrastructure.adapters.nca_scraper import NCAScraper
 from src.infrastructure.adapters.pdf_parser import PDFParser
 from src.infrastructure.constants import (
     BASE_STORAGE_PATH,
@@ -21,7 +21,7 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 # adapters
-scraper = NCAScraper()
+scraper = Bs4Scraper()
 parser = PDFParser()
 storage = S3Storage(base_storage_path=BASE_STORAGE_PATH)
 repository = SupabaseRepository(db_bulk_size=DB_BULK_SIZE)

@@ -12,13 +12,14 @@ from src.core.use_cases.raw_table_cleaner import RawTableCleaner
 from src.core.use_cases.raw_table_extractor import RawTableExtractor
 from src.core.use_cases.release_batcher import ReleaseBatcher
 from src.core.use_cases.releases_scraper import ReleasesScraper
+from src.infrastructure.adapters.bs4_scraper import Bs4Scraper
 from src.infrastructure.adapters.s3_storage import S3Storage
+from src.infrastructure.adapters.scrapy_scraper import ScrapyScraper
 from src.logging_config import setup_logging
 
 from src.infrastructure.adapters.mock_queue import MockQueue
 from src.infrastructure.adapters.supabase_repository import SupabaseRepository
 from src.infrastructure.adapters.local_storage import LocalStorage
-from src.infrastructure.adapters.nca_scraper import NCAScraper
 from src.infrastructure.adapters.pd_data_cleaner import PdDataCleaner
 from src.infrastructure.adapters.pdf_parser import PDFParser
 from src.infrastructure.constants import (
@@ -39,7 +40,8 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 # adapters
-scraper = NCAScraper()
+scraper = Bs4Scraper()
+# scraper = ScrapyScraper()
 # storage = LocalStorage(base_storage_path=BASE_STORAGE_PATH)
 storage = S3Storage(base_storage_path=BASE_STORAGE_PATH)
 parser = PDFParser()
