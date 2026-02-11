@@ -118,14 +118,17 @@ class PdDataCleaner(DataCleanerProvider):
         return pd.DataFrame(df[~df_result])
 
     def _join_col_to_str(self, col: List[str]):
+        """
+        step 1: ['hhhhh', 'lskdjf', '', 'adba', 'dlskj']
+        step 2: ' hhhhh lskdjf'
+        step 3: 'hhhhh lskdjf'
+        """
         joined_str = ""
-        last_item = None
         for item in col:
-            if last_item == item:
-                continue
+            if not item or item is np.nan:
+                break
             if item and item is not np.nan:
                 joined_str += " " + item
-                last_item = item
         return joined_str
 
     def _create_df_records(self, df: pd.DataFrame):
