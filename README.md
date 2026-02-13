@@ -17,7 +17,7 @@ This project focuses exclusively on the **ingestion layer**: it autonomously mon
 - [Database Setup](#database-setup)
 - [How to Run](#how-to-run)
   - [A. Locally](#a-locally)
-  - [B. AWS Deployment (Manual)](#b-aws-deployment)
+  - [B. AWS Deployment](#b-aws-deployment)
     - [1. Infrastructure Setup (One-Time)](#1-infrastructure-setup-one-time)
     - [2. Packaging & Updating Code](#2-packaging--updating-code)
 
@@ -84,6 +84,7 @@ The pipeline follows a **Fan-Out / Worker** pattern with batched processing to o
 * Pushes a message containing the `release` and metadata to **SQS A**.
 
 
+#### Release Model
 ```python
 class Release(BaseModel):
     id: str
@@ -105,6 +106,7 @@ class Release(BaseModel):
 * **Fan-Out:** Pushes a message for each *batch*.
 
 
+#### ReleaseBatch Model
 ```python
 class ReleaseBatch(BaseModel):
     batch_num: int
@@ -259,14 +261,14 @@ python -m src.main
 
 ### B. AWS Deployment
 #### 1. Install AWS CLI
-Make sure you have the AWS CLI installed and configured on your machine.
+Make sure you have the AWS CLI installed.
 ```bash
 pip install awscli
 ```
 
 #### 2. Configure AWS CLI
 
-Set up your AWS profile with the necessary permissions.
+Set up your AWS with the necessary permissions.
 ```bash
 aws configure
 ```
@@ -302,28 +304,31 @@ AWS_SQS_RELEASE_BATCH_QUEUE_URL=https://sqs.<REGION>.amazonaws.com/<ACCOUNT_ID>/
 Before deploying the codes, run the script to set up the necessary AWS resources.
 
 ```bash
+# export AWS_PROFILE=<YOUR_AWS_PROFILE_NAME> # uncomment if your are using non-default AWS profile
+
+# run in root directory
 python -m src.initialize_aws
 ```
 
-##### The script will create the following resources:
+*The script will create the following resources:*
 
-1. **S3 Bucket A**
+1. **S3 Bucket A (PDF Files)**
 * *Name:* `dbm-nca-ph-release-files`
-* *Description:* A bucket for storing raw PDF files of NCA releases. The scraper uploads the PDFs here, and the orchestrator/worker functions read from this bucket to process the data.
+* *Description:* A bucket for storing raw PDF files of NCA releases.
 * *Note:* Name is similar to `AWS_S3_BUCKET_NAME` in the environment variables.
 
-2. **S3 Bucket B**
-* *Name:* `dbm-nca-ph-lambda-deployment`
-* *Description:* A bucket for Lambda deployment packages (optional, can also use direct upload).
+2. **S3 Bucket B (Zip Files)**
+* *Name:* `dbm-nca-ph-lambda-deployments`
+* *Description:* A bucket for Lambda deployment packages for a more reliable and faster deployments.
 
-2. **SQS Queue A**
+2. **SQS Queue A ([Release](#release-model))**
 * *Name:* `dbm-nca-ph-release-queue`
-* *Description:* A standard queue for **release messages**. Each message contains metadata about a new NCA release and triggers the orchestration process.
+* *Description:* A standard queue for **release messages**.
 * *Note*: URL is the same as `AWS_SQS_RELEASE_QUEUE_URL` in the environment variables.
 
-3. **SQS Queue B**
+3. **SQS Queue B ([ReleaseBatch](#releasebatch-model))**
 * *Name:* `dbm-nca-ph-release-batch-queue`
-* *Description:* A standard queue for **batch messages**. Each message contains information about a specific batch of pages to process, triggered by the orchestrator and consumed by the worker.
+* *Description:* A standard queue for **batch messages**.
 * *Note*: URL is the same as `AWS_SQS_RELEASE_BATCH_QUEUE_URL` in the environment variables.
 
 4. **Lambda A (Scraper)**
@@ -349,6 +354,8 @@ python -m src.initialize_aws
 Navigate to the `handlers/` directory and use the deployment script:
 
 ```bash
+cd handlers
+
 # Usage: ./deploy.sh <SOURCE_FILE> <FUNCTION_NAME>
 
 ./deploy.sh scraper.py dbmScraper
