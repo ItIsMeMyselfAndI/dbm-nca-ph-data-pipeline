@@ -11,11 +11,11 @@ This project focuses exclusively on the **ingestion layer**: it autonomously mon
 - [Architecture](#architecture)
   - [Data Flow Breakdown](#data-flow-breakdown)
 - [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
-- [Installation](#installation)
+- [Project Structure](#-project-structure)
+- [Installation](#-installation)
 - [Environment Variables](#environment-variables)
-- [Database Setup](#database-setup)
-- [How to Run](#how-to-run)
+- [Database Setup](#-database-setup)
+- [How to Run](#-how-to-run)
   - [A. Locally](#a-locally)
   - [B. AWS Deployment](#b-aws-deployment)
     - [1. Infrastructure Setup (One-Time)](#1-infrastructure-setup-one-time)
@@ -79,6 +79,7 @@ The pipeline follows a **Fan-Out / Worker** pattern with batched processing to o
 
 1. **Ingestion (Lambda A):**
 * Triggered by a scheduled event (Cron) or *manually*.
+* Enables the triggers for lambda B and C
 * Scrapes the DBM website for new NCA releases.
 * Uploads the raw PDF to **S3** and **Database**.
 * Pushes a message containing the `release` and metadata to **SQS A**.
@@ -124,7 +125,10 @@ class ReleaseBatch(BaseModel):
 * Extracts, cleans, and consolidates data using `pandas`.
 * Inserts the structured rows into **Supabase**.
 
-
+4. **Teardown (Lambda D):**
+* Triggered by an **SNS notification** when all releases have been processed (detected via CloudWatch Alarm on SQS B).
+* Disables the triggers for Lambda B and C to prevent unnecessary polling and costs until the next scraping cycle.
+* Optionally, it can also send a summary notification (e.g., via email or Slack) about the completed processing.
 
 
 ## 📂 Project Structure
@@ -136,6 +140,7 @@ class ReleaseBatch(BaseModel):
 │   ├── scraper.py                          # Handler for Lambda A
 │   ├── orchestrator.py                     # Handler for Lambda B
 │   ├── worker.py                           # Handler for Lambda C
+│   ├── teardown.py                         # Handler for Lambda D
 │   ├── dbmScraper_requirements.txt
 │   ├── dbmOrchestrator_requirements.txt
 │   └── dbmWorker_requirements.txt
@@ -321,32 +326,50 @@ python -m src.initialize_aws
 * *Name:* `dbm-nca-ph-lambda-deployments`
 * *Description:* A bucket for Lambda deployment packages for a more reliable and faster deployments.
 
-2. **SQS Queue A ([Release](#release-model))**
+3. **SQS Queue A ([Release](#release-model))**
 * *Name:* `dbm-nca-ph-release-queue`
 * *Description:* A standard queue for **release messages**.
 * *Note*: URL is the same as `AWS_SQS_RELEASE_QUEUE_URL` in the environment variables.
 
-3. **SQS Queue B ([ReleaseBatch](#releasebatch-model))**
+4. **SQS Queue B ([ReleaseBatch](#releasebatch-model))**
 * *Name:* `dbm-nca-ph-release-batch-queue`
 * *Description:* A standard queue for **batch messages**.
 * *Note*: URL is the same as `AWS_SQS_RELEASE_BATCH_QUEUE_URL` in the environment variables.
 
-4. **Lambda A (Scraper)**
+5. **SQS Dead Letter Queue**
+* *Name:* `dbm-nca-ph-failed-queues`
+* *Description:* A queue for messages that fail processing after 1 attempt in either **SQS A** or **SQS B** for debugging and monitoring purposes.
+
+6. **SNS Notification A**
+* *Name:* `dbm-nca-ph-release-batch-queue-idle-topic`
+* *Description:* A topic for notifying the completion of all batches for a release.
+
+7. **CloudWatch Alarm**
+* *Name:* `dbm-nca-ph-release-batch-queue-idle-alarm`
+* *Description:* An alarm that triggers when **SQS B** has no messages for a specified duration (e.g., 15 minutes). This alarm will publish a notification to **SNS Notification A** to trigger the teardown process.
+
+8. **Lambda A (Scraper)**
 * *Name:* `dbmScraper`
 * *Description:* A function that scrapes the DBM website for new NCA releases, uploads PDFs to S3, insert entries to Supabase, and pushes metadata messages to **SQS A**.
 * *Runtime:* Python 3.14
 
-5. **Lambda B (Orchestrator)**
+9. **Lambda B (Orchestrator)**
 * *Name:* `dbmOrchestrator`
 * *Description:* A function that listens to **SQS A**, downloads the PDF from S3 to determine page count, creates batches of pages, and pushes batch messages to **SQS B**.
 * *Runtime:* Python 3.14
 * *Trigger:* **SQS Queue A**
 
-6. **Lambda C (Worker):**
+10. **Lambda C (Worker):**
 * *Name:* `dbmWorker`
 * *Description:* A function that listens to **SQS B**, downloads the PDF for the specified batch, extracts and processes the data, and inserts structured records into Supabase.
 * *Runtime:* Python 3.14
 * *Trigger:* **SQS Queue B**
+
+11. **Lambda D (Teardown):**
+* *Name:* `dbmTeardown`
+* *Description:* A function that disables the triggers for Lambda B and C after all releases have been processed to prevent unnecessary polling and costs.
+* *Runtime:* Python 3.14
+* *Trigger:* **SNS Notification A**
 
 
 #### 5. Deploying Updates (Automated)
@@ -361,6 +384,7 @@ cd handlers
 ./deploy.sh scraper.py dbmScraper
 ./deploy.sh orchestrator.py dbmOrchestrator
 ./deploy.sh worker.py dbmWorker
+./deploy.sh teardown.py dbmTeardown
 ```
 
 > [!IMPORTANT]
